@@ -30,7 +30,7 @@ from math import *
 
 
 
-def Import_File(fname, reduced = False):
+def import_file(fname, reduced = False):
 
     bands = np.loadtxt(fname)
 
@@ -331,8 +331,8 @@ the minimum spacing of the input data.
             # print pts.shape[:]
             # dir = np.array(args.cut.split(','),dtype=float)
         
-        # (E,kx,ky) = Import_File(file, write_out = (dir is None))
-        (E,kmesh,dim) = Import_File(file,args.reduced)
+        # (E,kx,ky) = import_file(file, write_out = (dir is None))
+        (E,kmesh,dim) = import_file(file,args.reduced)
         nk = np.zeros(3)
         nk = [kmesh[0].shape[0],kmesh[1].shape[0],kmesh[2].shape[0]]
                     
