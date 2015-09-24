@@ -75,7 +75,7 @@ def import_file(fname, reduced = False):
     if (kz.shape[0] == 1): dim = 2 # we are effectively 2D 
     if (ky.shape[0] == 1 and kz.shape[0] == 1): dim = 1 # we are effectively 1D 
 
-    print "Detected %d-dimensional k-space with nb=%d bands "%(dim, nbands)        
+    print "Detected a %d-dimensional k-space with %d bands "%(dim, nbands)        
 
 
     E  =  np.zeros((kx.shape[0],ky.shape[0],kz.shape[0],nbands))
@@ -353,7 +353,7 @@ the minimum spacing of the input data.
             for i in range(pts.shape[0]-1):
                  p1 = pts[i,:]     
                  p2 = pts[i+1,:]                      
-                 print "Segment: %s --- %s"%(p1,p2)
+                 print "Segment: %s --> %s"%(p1,p2)
                  header = "#\n# Slice on a line segment connecting %s and %s \n#\n"%(p1,p2)
                  (E_,kx_,lenght) = slice_on_line(E, kmesh, dim, nk, p1, p2, lenght, spacing = args.spacing)
                  nk_ = np.array((kx_.shape[0],0,0))
