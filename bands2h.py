@@ -22,9 +22,17 @@ from __future__ import division
 import argparse
 import sys
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:
+    print "numpy is not installed"
 
-from scipy import interpolate
+try:
+    from scipy import interpolate
+except ImportError:
+    print "scipy is not installed"
+
+
 
 from math import *
 
