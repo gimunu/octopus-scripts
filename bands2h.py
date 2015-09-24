@@ -227,6 +227,11 @@ def slice_on_line(E, kmesh, dim, nk, p1, p2, len0, spacing = None):
     for iu in range(u.shape[0]):
         kk[iu,:] = np.array(line(v, p1 ,u[iu]))
 
+    # Check that the requested points are within the bounds of the input grid
+    if (not points_in_bounds(kk,grid_bounds(kmesh,dim))):
+        print('Error:Some of the requested output grid point is outside the bounds of the input grid.\nCurrent bounds are:\n%s'%grid_bounds(kmesh, dim))                
+        sys.exit(1)    
+
     #Loop over all the bands
     for ib in range(nbands):
         if dim < 3:
@@ -236,10 +241,6 @@ def slice_on_line(E, kmesh, dim, nk, p1, p2, len0, spacing = None):
             # print (kmesh[0][:], kmesh[1][:], kmesh[2][:])
             # print kk
             
-            if (not points_in_bounds(kk,grid_bounds(kmesh,dim))):
-                print('Error:Some of the requested output grid point is outside the bounds of the input grid.\nBounds:\n%s'%grid_bounds(kmesh, dim))                
-                # raise ValueError('Some of the requested output grid point is outside the bounds of the input grid.\nBounds:\n%s'%grid_bounds(kmesh, dim))
-                sys.exit(1)    
              
             f = interpolate.RegularGridInterpolator((kmesh[0][:], kmesh[1][:], kmesh[2][:]), E[:,:,:,ib])
             Eout[:,0,ib] = f(kk)
