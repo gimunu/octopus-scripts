@@ -35,16 +35,23 @@ except ImportError:
 from vtk.util import numpy_support as VN
 
 
+from math import *
+
 import vtk
 import pylab as pl
 
-# try:
-#     from scipy import interpolate
-# except ImportError:
-#     print "scipy is not installed"
+
+# list of supported geometries
+geometries = ["sphere", 
+              "cylinder", 
+              "parallelepiped"]
+              
+parameters = [{'center':[0,3],'radius': 3 }, 
+              {'center':[0,3],'axis'  :[3,6],'radius': 6 },
+              {'center':[0,3],'axis'  :[3,6],'sides': [6,9]}] 
 
 
-def display_vtk(filename):
+def display_vtk(filename, geometry = None):
     
     # Prepare to read the file
     reader = vtk.vtkStructuredPointsReader()
@@ -55,7 +62,6 @@ def display_vtk(filename):
     # just for illustration:
     # get the extent of the data and print it
     W,H,D = reader.GetOutput().GetDimensions()
-    # string formatting is similar to the sprintf style in C
     print "Reading '%s', width=%i, height=%i, depth=%i" %(filename, W, H, D)
 
     # create an outline of the dataset
@@ -85,7 +91,27 @@ def display_vtk(filename):
     isosurf = vtk.vtkActor()
     isosurf.SetMapper(isosurfMapper)
 
-    # Add sphere
+    # Add geometries
+    geoActors= []
+    for geo in geometry:
+        if geo['shape'] == 'sphere':
+            par = parameters[0]     
+            
+            source = vtk.vtkSphereSource()
+            source.SetCenter(geo['parameters'][par['center'][0]:par['center'][1]])
+            source.SetRadius(geo['parameters'][par['radius']])
+            # mapper
+            mapper = vtk.vtkPolyDataMapper()
+            if vtk.VTK_MAJOR_VERSION <= 5:
+                mapper.SetInput(source.GetOutput())
+            else:
+                mapper.SetInputConnection(source.GetOutputPort())
+            # actor
+            actor = vtk.vtkActor()
+            actor.SetMapper(mapper)
+            actor.GetProperty().SetOpacity(0.5)
+            actor.GetProperty().SetColor(1.0,0.5,0.5)
+            geoActors.append(actor)
 
     # renderer and render window 
     ren = vtk.vtkRenderer()
@@ -101,6 +127,9 @@ def display_vtk(filename):
     # add the actors
     ren.AddActor( outlineActor )
     ren.AddActor( isosurf )
+    for act in geoActors:
+        ren.AddActor( act )
+        
     renWin.Render()
 
     # create window to image filter to get the window to an image
@@ -151,9 +180,9 @@ def read_vtk(filename, skipGrid = False):
     vec = list(dim)
     vec = [i-1 for i in dim]
     vec.append(3)
-    print dim
-    print vec
-    print data.GetPointData()
+    # print dim
+    # print vec
+    # print data.GetPointData()
 
     u = VN.vtk_to_numpy(data.GetPointData().GetArray('scalar_field'))
     # nodes_nummpy_array = VN.vtk_to_numpy(data.GetPoints().GetData())
@@ -177,7 +206,37 @@ def read_vtk(filename, skipGrid = False):
     
     return (u, [x,y,z])
 
+def get_geometry(string):
+    # generate the short names
+    geometries_abbr= [x[0:3] for x in geometries]
+
+    #lowercase and split on ";"
+    shapetokens = np.array(string.lower().split(';'))
+    geometry = []
+    for string in shapetokens:
+        # get the name of the geometrical shape
+        geotype = string[0:string.find("(")].strip()
+        # is this a recognized geometry?
+        if not geotype in geometries and not geotype in geometries_abbr:
+            raise Exception("\"%s\" is not a recognized geometry."%(geotype))
+        
+        # get the string between rounded brackets
+        values = string[string.find("(")+1:string.find(")")].split(',')
+        values = [eval(val) for val in values] # evaluate expressions contained in each component
+
+        # get full-name if short
+        if geotype in geometries_abbr:
+            geotype = geometries[geometries_abbr.index(geotype)]
+            
+        if geotype == 'sphere' or geotype == 'sph':
+            geo = {"shape": geotype, "parameters": values}
+            geometry.append(geo)
+        
+    return geometry    
+    
+##############################################################    
 ######################## MAIN ################################
+##############################################################    
 
 def main(args):
 
@@ -200,24 +259,12 @@ To process input file(s):
                                      formatter_class=argparse.RawTextHelpFormatter)
 
 
-#     parser.add_argument('-c', '--cut', action='store', metavar='p1x,p1y,p1z;p2x,p2y,p2z[;p3 ...]', default= None,
-#     help=
-# """Cut the bands structure along a segmented line connecting
-# two, or more, points of the Brillouin zone in sequence.
-# Each segment is defined by two points p1=(p1x,p1y,p1z) and
-# p2=(p2x,p2y,p2z) and is parametrized as following:
-# v = (p2-p1) * t + p1.
-# The coordinates of each point are passed as a string in a
-# column-separated triplet. For example:
-#
-# -c "p1x,p1y,p1z;p1x,p1y,p1z;[...]"
-#
-# Point coordinates can also be expressed as mathematical
-# formula such as:
-#
-# -c "0, 0, 0 ; 1/2, cos(pi/4), sin(pi/4); 1, 1, 1"
-#
-# """)
+    parser.add_argument('-g', '--geometry', action='store', metavar='sphere(cx,cy,cz,R) [;sphere ...]', default= None,
+    help=
+""" Define the geometry where the charge is integrated. 
+The available geometries are sphere, cylinder and parallelepiped.
+
+""")
 #
 #     parser.add_argument('-d', '--spacing', type=float, metavar='float', default= None,
 #     help=
@@ -238,16 +285,30 @@ To process input file(s):
 
     args = parser.parse_args()
     
+    geometry = None
+    if args.geometry:
+        geometry = get_geometry(args.geometry)
+        
+    for geo in geometry:    
+        print geo
+        par = parameters[0]        
+        print par['center'][0]
+        print geo['parameters'][par['center'][0]:par['center'][1]]
+        print geo['parameters'][par['radius']]
 
     
-    
+    multiplefiles = False 
     for file in args.file: 
             print file
-            display_vtk(file)
-            # (wf, grid) =read_vtk(file)
+            if args.display:
+                display_vtk(file, geometry)
+            if multiplefiles:    
+                wf =read_vtk(file, skipGrid = True)
+            else:    
+                (wf, grid) =read_vtk(file)
             # print wf
             # print grid
-        
+            multiplefiles = True
 
 
 if __name__ == "__main__":
