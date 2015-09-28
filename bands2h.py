@@ -318,8 +318,6 @@ the minimum spacing of the input data.
     parser.add_argument('file', nargs='+')
     
 
-    # parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
-
     args = parser.parse_args()
     
 
