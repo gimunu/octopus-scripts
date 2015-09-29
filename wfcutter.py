@@ -47,11 +47,11 @@ geometries = ["sphere",
               "parallelepiped"]
               
 parameters = [{'center':[0,3],'radius': 3 }, 
-              {'center':[0,3],'axis'  :[3,6],'radius': 6 },
+              {'center':[0,3],'axis'  :[3,6],'radius': 6 , 'height': 7},
               {'center':[0,3],'axis'  :[3,6],'sides': [6,9]}] 
 
 
-def display_vtk(filename, geometry = None):
+def display_vtk(filename, geometry = None, isolevel = 0.1):
     
     # Prepare to read the file
     reader = vtk.vtkStructuredPointsReader()
@@ -81,25 +81,28 @@ def display_vtk(filename, geometry = None):
     # Get the isosurface of our data
     isosurfExtractor = vtk.vtkContourFilter()
     isosurfExtractor.SetInputConnection(reader.GetOutputPort())
-    isosurfExtractor.SetValue(0, 0.1)
+    isosurfExtractor.SetValue(0, isolevel)
     isosurfNormals = vtk.vtkPolyDataNormals()
     isosurfNormals.SetInputConnection(isosurfExtractor.GetOutputPort())
     isosurfNormals.SetFeatureAngle(60.0)
     isosurfMapper = vtk.vtkPolyDataMapper()
     isosurfMapper.SetInputConnection(isosurfNormals.GetOutputPort())
     isosurfMapper.ScalarVisibilityOff()
-    isosurf = vtk.vtkActor()
-    isosurf.SetMapper(isosurfMapper)
+    isosurfActor = vtk.vtkActor()
+    isosurfActor.SetMapper(isosurfMapper)
 
     # Add geometries
     geoActors= []
     for geo in geometry:
-        if geo['shape'] == 'sphere':
-            par = parameters[0]     
-            
+        par = parameters[geometries.index(geo['shape'])]     
+
+        if geo['shape'] == 'sphere':            
             source = vtk.vtkSphereSource()
             source.SetCenter(geo['parameters'][par['center'][0]:par['center'][1]])
             source.SetRadius(geo['parameters'][par['radius']])
+            source.SetThetaResolution(50)
+            source.SetPhiResolution(50)
+            
             # mapper
             mapper = vtk.vtkPolyDataMapper()
             if vtk.VTK_MAJOR_VERSION <= 5:
@@ -112,6 +115,26 @@ def display_vtk(filename, geometry = None):
             actor.GetProperty().SetOpacity(0.5)
             actor.GetProperty().SetColor(1.0,0.5,0.5)
             geoActors.append(actor)
+
+        if geo['shape'] == 'cylinder':
+            source = vtk.vtkCylinderSource()
+            source.SetCenter(geo['parameters'][par['center'][0]:par['center'][1]])
+            source.SetRadius(geo['parameters'][par['radius']])
+            source.SetHeight(geo['parameters'][par['height']])
+            source.SetResolution(100)
+            
+            # mapper
+            mapper = vtk.vtkPolyDataMapper()
+            if vtk.VTK_MAJOR_VERSION <= 5:
+                mapper.SetInput(source.GetOutput())
+            else:
+                mapper.SetInputConnection(source.GetOutputPort())
+            # actor
+            actor = vtk.vtkActor()
+            actor.SetMapper(mapper)
+            actor.GetProperty().SetOpacity(0.5)
+            actor.GetProperty().SetColor(1.0,0.5,0.5)
+            geoActors.append(actor)    
 
     # renderer and render window 
     ren = vtk.vtkRenderer()
@@ -126,7 +149,7 @@ def display_vtk(filename, geometry = None):
 
     # add the actors
     ren.AddActor( outlineActor )
-    ren.AddActor( isosurf )
+    ren.AddActor( isosurfActor )
     for act in geoActors:
         ren.AddActor( act )
         
@@ -138,14 +161,13 @@ def display_vtk(filename, geometry = None):
 
     # create png writer
     wr = vtk.vtkPNGWriter()
-    # wr.SetInput(w2if.GetOutput())
     wr.SetInputConnection(w2if.GetOutputPort())
 
     # Python function for the keyboard interface
     # count is a screenshot counter
     count = 0
     def Keypress(obj, event):
-        global count, iv
+        global count
         key = obj.GetKeySym()
         if key == "s":
             renWin.Render()     
@@ -155,8 +177,13 @@ def display_vtk(filename, geometry = None):
             wr.Write()
             print "Saved '%s'" %(fnm)
             count = count+1
-            # add your keyboard interface here
-            # elif key == ...
+        if key == "q":
+            #quit
+            print "Exit"
+            exit()                
+
+        # add your keyboard interface here
+        # elif key == ...
 
     # add keyboard interface, initialize, and start the interactor
     iren.AddObserver("KeyPressEvent", Keypress)
@@ -207,6 +234,8 @@ def read_vtk(filename, skipGrid = False):
     return (u, [x,y,z])
 
 def get_geometry(string):
+    """ Parse geometry properties from sting"""
+    
     # generate the short names
     geometries_abbr= [x[0:3] for x in geometries]
 
@@ -228,11 +257,38 @@ def get_geometry(string):
         if geotype in geometries_abbr:
             geotype = geometries[geometries_abbr.index(geotype)]
             
-        if geotype == 'sphere' or geotype == 'sph':
-            geo = {"shape": geotype, "parameters": values}
-            geometry.append(geo)
+        geo = {"shape": geotype, "parameters": values}
+        geometry.append(geo)
         
     return geometry    
+    
+def integrateOverVolume(func, grid, geometry):
+    print grid[0].shape[:]
+    print grid[1].shape[:]
+    print grid[2].shape[:]
+
+    print grid[0][1][0][0],  grid[0][0][0][0]
+    print grid[1][0][1][0],  grid[1][0][0][0]
+    print grid[2][0][0][1],  grid[2][0][0][0]
+
+    
+    spacing=np.zeros(3)
+    for idim in range(3):
+        spacing[idim] = abs(grid[idim][1][0][0]-grid[idim][0][0][0])
+        
+    print spacing
+    assert all(x == spacing[0] for x in spacing), "Cannot integrate! The grid appears to be not equally spaced."
+    
+    res = np.zeros(len(geometry))
+    print res
+    
+    print    grid[0][grid[0].shape[0]/2]
+
+    
+    tot = sum(res[:])
+    
+    return (tot, res)
+    
     
 ##############################################################    
 ######################## MAIN ################################
@@ -265,14 +321,13 @@ To process input file(s):
 The available geometries are sphere, cylinder and parallelepiped.
 
 """)
-#
-#     parser.add_argument('-d', '--spacing', type=float, metavar='float', default= None,
-#     help=
-# """Define the output grid spacing. The default value is
-# the minimum spacing of the input data.
-# """
-#     )
-#
+
+    parser.add_argument('--isolevel', type=float, metavar='float', default= 0.1,
+    help=
+"""Define the value of at wich calculate the iso-surface (default 0.1).
+"""
+    )
+
     parser.add_argument('-d','--display', action="store_true", default=False,
     help="Display the data isosurface and the integration volumes.")
     
@@ -290,24 +345,25 @@ The available geometries are sphere, cylinder and parallelepiped.
         geometry = get_geometry(args.geometry)
         
     for geo in geometry:    
-        print geo
-        par = parameters[0]        
-        print par['center'][0]
-        print geo['parameters'][par['center'][0]:par['center'][1]]
-        print geo['parameters'][par['radius']]
+        # print geo
+        par = parameters[geometries.index(geo['shape'])]        
+        # print par['center'][0]
+        # print geo['parameters'][par['center'][0]:par['center'][1]]
+        # print geo['parameters'][par['radius']]
 
     
     multiplefiles = False 
     for file in args.file: 
             print file
             if args.display:
-                display_vtk(file, geometry)
+                display_vtk(file, geometry, args.isolevel)
             if multiplefiles:    
                 wf =read_vtk(file, skipGrid = True)
             else:    
                 (wf, grid) =read_vtk(file)
-            # print wf
-            # print grid
+                
+            integral = integrateOverVolume(wf, grid, geometry)
+                
             multiplefiles = True
 
 
