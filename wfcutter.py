@@ -22,15 +22,9 @@ from __future__ import division
 import argparse
 import sys
 
-try:
-    import numpy as np
-except ImportError:
-    print "numpy is not installed"
+import numpy as np
 
-try:
-    from vtk import vtkStructuredPointsReader
-except ImportError:
-    print "vtk is not installed"
+from vtk import vtkStructuredPointsReader
     
 from vtk.util import numpy_support as VN
 
@@ -38,7 +32,6 @@ from vtk.util import numpy_support as VN
 from math import *
 
 import vtk
-import pylab as pl
 
 
 # list of supported geometries
@@ -93,48 +86,49 @@ def display_vtk(filename, geometry = None, isolevel = 0.1):
 
     # Add geometries
     geoActors= []
-    for geo in geometry:
-        par = parameters[geometries.index(geo['shape'])]     
+    if geometry != None:
+        for geo in geometry:
+            par = parameters[geometries.index(geo['shape'])]     
 
-        if geo['shape'] == 'sphere':            
-            source = vtk.vtkSphereSource()
-            source.SetCenter(geo['parameters'][par['center'][0]:par['center'][1]])
-            source.SetRadius(geo['parameters'][par['radius']])
-            source.SetThetaResolution(50)
-            source.SetPhiResolution(50)
+            if geo['shape'] == 'sphere':            
+                source = vtk.vtkSphereSource()
+                source.SetCenter(geo['parameters'][par['center'][0]:par['center'][1]])
+                source.SetRadius(geo['parameters'][par['radius']])
+                source.SetThetaResolution(50)
+                source.SetPhiResolution(50)
             
-            # mapper
-            mapper = vtk.vtkPolyDataMapper()
-            if vtk.VTK_MAJOR_VERSION <= 5:
-                mapper.SetInput(source.GetOutput())
-            else:
-                mapper.SetInputConnection(source.GetOutputPort())
-            # actor
-            actor = vtk.vtkActor()
-            actor.SetMapper(mapper)
-            actor.GetProperty().SetOpacity(0.5)
-            actor.GetProperty().SetColor(1.0,0.5,0.5)
-            geoActors.append(actor)
+                # mapper
+                mapper = vtk.vtkPolyDataMapper()
+                if vtk.VTK_MAJOR_VERSION <= 5:
+                    mapper.SetInput(source.GetOutput())
+                else:
+                    mapper.SetInputConnection(source.GetOutputPort())
+                # actor
+                actor = vtk.vtkActor()
+                actor.SetMapper(mapper)
+                actor.GetProperty().SetOpacity(0.5)
+                actor.GetProperty().SetColor(1.0,0.5,0.5)
+                geoActors.append(actor)
 
-        if geo['shape'] == 'cylinder':
-            source = vtk.vtkCylinderSource()
-            source.SetCenter(geo['parameters'][par['center'][0]:par['center'][1]])
-            source.SetRadius(geo['parameters'][par['radius']])
-            source.SetHeight(geo['parameters'][par['height']])
-            source.SetResolution(100)
+            if geo['shape'] == 'cylinder':
+                source = vtk.vtkCylinderSource()
+                source.SetCenter(geo['parameters'][par['center'][0]:par['center'][1]])
+                source.SetRadius(geo['parameters'][par['radius']])
+                source.SetHeight(geo['parameters'][par['height']])
+                source.SetResolution(100)
             
-            # mapper
-            mapper = vtk.vtkPolyDataMapper()
-            if vtk.VTK_MAJOR_VERSION <= 5:
-                mapper.SetInput(source.GetOutput())
-            else:
-                mapper.SetInputConnection(source.GetOutputPort())
-            # actor
-            actor = vtk.vtkActor()
-            actor.SetMapper(mapper)
-            actor.GetProperty().SetOpacity(0.5)
-            actor.GetProperty().SetColor(1.0,0.5,0.5)
-            geoActors.append(actor)    
+                # mapper
+                mapper = vtk.vtkPolyDataMapper()
+                if vtk.VTK_MAJOR_VERSION <= 5:
+                    mapper.SetInput(source.GetOutput())
+                else:
+                    mapper.SetInputConnection(source.GetOutputPort())
+                # actor
+                actor = vtk.vtkActor()
+                actor.SetMapper(mapper)
+                actor.GetProperty().SetOpacity(0.5)
+                actor.GetProperty().SetColor(1.0,0.5,0.5)
+                geoActors.append(actor)    
 
     # renderer and render window 
     ren = vtk.vtkRenderer()
@@ -261,29 +255,51 @@ def get_geometry(string):
         geometry.append(geo)
         
     return geometry    
+
+def pointInVolume(pnt, geo):
+    pnt = np.array(pnt, dtype=np.float)
+    par = parameters[geometries.index(geo['shape'])]  
+    
+    center = np.array(geo['parameters'][par['center'][0]:par['center'][1]], dtype=np.float)
+    
+    if geo['shape'] == 'sphere': 
+        d = pnt - center
+        R2 = geo['parameters'][par['radius']]**2
+        if (d.dot(d)<= R2):
+            return True
+        
+    return False 
     
 def integrateOverVolume(func, grid, geometry):
-    print grid[0].shape[:]
-    print grid[1].shape[:]
-    print grid[2].shape[:]
-
-    print grid[0][1][0][0],  grid[0][0][0][0]
-    print grid[1][0][1][0],  grid[1][0][0][0]
-    print grid[2][0][0][1],  grid[2][0][0][0]
-
+    x = grid[0][:][:][:]
+    y = grid[1][:][:][:]
+    z = grid[2][:][:][:]
     
     spacing=np.zeros(3)
-    for idim in range(3):
-        spacing[idim] = abs(grid[idim][1][0][0]-grid[idim][0][0][0])
+    spacing[0] = abs(x[1][0][0]-x[0][0][0])
+    spacing[1] = abs(y[0][1][0]-y[0][0][0])
+    spacing[2] = abs(z[0][0][1]-z[0][0][0])
+    
+    # for idim in range(3):
+    #     spacing[idim] = abs(grid[idim][1][0][0]-grid[idim][0][0][0])
+
         
-    print spacing
     assert all(x == spacing[0] for x in spacing), "Cannot integrate! The grid appears to be not equally spaced."
     
-    res = np.zeros(len(geometry))
-    print res
     
-    print    grid[0][grid[0].shape[0]/2]
-
+    res = np.zeros(len(geometry))
+    
+    for i in range(x.shape[0]):
+        for j in range(y.shape[1]):
+            for k in range(z.shape[2]):
+                pnt = [x[i][j][k], y[i][j][k], z[i][j][k]]
+                
+                l=0
+                for geo in geometry:
+                    res[l] += (func[i][j][k]  if ( pointInVolume(pnt,geo)) else 0) 
+                    l += 1
+    
+    res[:] = res[:]*spacing[0]**3
     
     tot = sum(res[:])
     
@@ -322,16 +338,15 @@ The available geometries are sphere, cylinder and parallelepiped.
 
 """)
 
-    parser.add_argument('--isolevel', type=float, metavar='float', default= 0.1,
-    help=
-"""Define the value of at wich calculate the iso-surface (default 0.1).
-"""
-    )
 
     parser.add_argument('-d','--display', action="store_true", default=False,
     help="Display the data isosurface and the integration volumes.")
     
     
+    parser.add_argument('--isolevel', type=float, metavar='float', default= 0.1,
+    help=
+"""Define the value of at wich calculate the iso-surface (default 0.1).
+""")
 
     parser.add_argument('file', nargs='+')
     
@@ -344,25 +359,26 @@ The available geometries are sphere, cylinder and parallelepiped.
     if args.geometry:
         geometry = get_geometry(args.geometry)
         
-    for geo in geometry:    
-        # print geo
-        par = parameters[geometries.index(geo['shape'])]        
-        # print par['center'][0]
-        # print geo['parameters'][par['center'][0]:par['center'][1]]
-        # print geo['parameters'][par['radius']]
-
     
     multiplefiles = False 
     for file in args.file: 
-            print file
             if args.display:
                 display_vtk(file, geometry, args.isolevel)
             if multiplefiles:    
-                wf =read_vtk(file, skipGrid = True)
+                (wf, ) =read_vtk(file, skipGrid = True)
             else:    
                 (wf, grid) =read_vtk(file)
-                
-            integral = integrateOverVolume(wf, grid, geometry)
+
+            if geometry:    
+                integral = integrateOverVolume(wf, grid, geometry)
+            else:
+                raise Exception("You must specify a geometry to define the integration volume.")
+                 
+            str = "%s\t%2.4e"%(file, integral[0])
+            if integral[1].shape[0] > 1:
+                for val in integral[1]:
+                    str += "\t%2.4e"%(val)
+            print str
                 
             multiplefiles = True
 
