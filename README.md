@@ -26,3 +26,13 @@ bands2h.py --help
 #### External dependencies
 * [numpy](http://www.numpy.org)
 * [scipy](http://www.scipy.org)
+
+## wfcutter.py
+This utility allow to analyze wavefunctions performing post-processing and visualization routines.  
+
+#### Examples
+
+#### External dependencies
+* [numpy](http://www.numpy.org)
+* [scipy](http://www.scipy.org)
+* [vtk](http://www.vtk.org/Wiki/VTK)
