@@ -38,7 +38,7 @@ wfcutter.py -g "sphere(0,0,0,10)" file.vtk
 ```
 
 
-To visualize an isosurface of the data and the integration volume:
+To visualize an isosurface of the data and the integration volume (defined by two interloking spheres):
 ```
 wfcutter.py wfcutter.py -g "sph(0,0,0,10); sph(5,0,0,10)" -d file.vtk
 
