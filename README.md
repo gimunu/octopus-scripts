@@ -28,9 +28,26 @@ bands2h.py --help
 * [scipy](http://www.scipy.org)
 
 ## wfcutter.py
-This utility allow to analyze wavefunctions performing post-processing and visualization routines.  
+This utility allow to analyze wavefunctions (vtk format) performing post-processing and visualization routines.  
 
 #### Examples
+To integrate a real wavefunction contained in ```file.vtk``` over a sphere of radius 10 centered in (0,0,0):
+```
+wfcutter.py -g "sphere(0,0,0,10)" file.vtk
+
+```
+
+
+To visualize an isosurface of the data and the integration volume:
+```
+wfcutter.py wfcutter.py -g "sph(0,0,0,10); sph(5,0,0,10)" -d file.vtk
+
+```
+
+For more info and a complete list of features:  
+```
+wfcutter.py --help
+``` 
 
 #### External dependencies
 * [numpy](http://www.numpy.org)
