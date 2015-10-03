@@ -350,7 +350,8 @@ def main(args):
     
     desc="""This utility allow to analyze wavefunctions and density obtained with octopus 
 integrating the charge over volumes defined as the union of basic shapes.
-It also provides a basic interface to visualize the data and the integration volume.    
+It also provides a basic interface to visualize the data and the integration volume.
+Only vtk data format is supported.    
 """
 
     epilog="""Examples:
