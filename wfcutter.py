@@ -262,20 +262,26 @@ def get_geometry(string):
     return geometry    
 
 def pointInGeo(pnt, geo):
-    try: 
+    try:
         ismat = pnt.shape[1] > 0
     except:
         ismat = False
         pnt = np.array(pnt, dtype=np.float)
-
+    
     par = parameters[geometries.index(geo['shape'])]  
     center = np.array(geo['parameters'][par['center'][0]:par['center'][1]], dtype=np.float)
 
     if geo['shape'] == 'sphere': 
         d = pnt - center
         R2 = geo['parameters'][par['radius']]**2
-        if (d.dot(d)<= R2):
-            return True
+        # print d.shape
+        if ismat:
+            res = np.dot(d,d.transpose()) <= R2
+            print res
+            return res
+        else:
+            if (d.dot(d)<= R2):
+                return True
 
     return False
 
@@ -290,18 +296,11 @@ def pointInVolume(pnt, geometry):
         
     return False 
     
-def integrateOverVolume(func, grid, geometry):
+def integrateOverVolume(func, grid, geometry, idxin = None):
         
     x = grid[0]
     y = grid[1]
     z = grid[2]
-    
-    print grid[:,0]
-    print x
-    print y
-    print z
-    print grid[0]
-    print grid[0,:]
      
     tmp = [np.unique(x),np.unique(y),np.unique(z)]
     spacing=np.zeros(3)
@@ -309,56 +308,41 @@ def integrateOverVolume(func, grid, geometry):
         spacing[idim]= abs(tmp[idim][1]-tmp[idim][0])            
     
     
-    res = np.zeros(len(geometry)+1)
 
     # print 'calculate mask'
-    # mask = pointInVolume(grid.transpose(),geometry)
-    # print mask
-    
-    idx = np.array([], dtype=np.int)
-
-    start = time.time()
-    # for k in range(z.shape[2]):
-    #     for j in range(y.shape[1]):
-    #         for i in range(x.shape[0]):
-    #             pnt = [x[i][j][k], y[i][j][k], z[i][j][k]]
+    # mask = pointInVolume(grid.transpose(), geometry)
+    # print 'mask = %s'%(mask)
     #
-    #             l=0
-    #             for geo in geometry:
-    #                 res[l] += (func[i][j][k]  if ( pointInVolume(pnt,geo)) else 0)
-    #                 l += 1
-    #             if pointInVolume(pnt,geometry):
-    #                 idx =np.append(idx,[i,j,k])
-
-    for ip in range(func.shape[0]):
-        pnt = [x[ip], y[ip], z[ip]]
-        # pnt = grid[:,ip]
-        
-        ig=0
-        for geo in geometry: 
-            res[ig] += (func[ip]  if ( pointInVolume(pnt,geo)) else 0) 
-            ig += 1
-
-        if pointInVolume(pnt,geometry):
-            idx =np.append(idx, ip)
-            res[len(geometry)] += func[ip]
-
-    end = time.time()
-    print "loop time %s"%(end - start)
+    # return 10
     
-    res[:] = res[:]*np.prod(spacing)
+    if idxin is None:
+        idx = np.array([], dtype=np.int)
+
+        start = time.time()
+        res = 0
+        for ip in range(func.shape[0]):
+            pnt = [x[ip], y[ip], z[ip]]
+
+            if pointInVolume(pnt,geometry):
+                idx =np.append(idx, ip)
+                res += func[ip]
+
+        end = time.time()
+        print "loop time %s"%(end - start)
     
-    # print idx
-    start = time.time()
-    msum = func[idx].sum()*np.prod(spacing)
-    end = time.time()
-    print "masked sum time %s"%(end - start)
-    print "value %s"%(msum)
-        
-    tot = res[:len(geometry)].sum()
-    print "res %s"%(res[-1])
+        res *= np.prod(spacing)
+    else:    
+        # print idx
+        idx = idxin
+        start = time.time()
+        res = func[idx].sum()*np.prod(spacing)
+        end = time.time()
+        print "masked sum time %s"%(end - start)
+        # print "value %s"%(msum)
+
+    # print "res %s"%(res)
     
-    return tot
+    return (res, idx)
     
     
 ##############################################################    
@@ -416,6 +400,7 @@ The available geometries are sphere, cylinder and parallelepiped.
         
     
     multiplefiles = False 
+    idx = None
     for file in args.file: 
             if args.display:
                 display_vtk(file, geometry, args.isolevel)
@@ -427,7 +412,7 @@ The available geometries are sphere, cylinder and parallelepiped.
                 (wf, grid) =read_vtk(file)
 
             if geometry:    
-                integral = integrateOverVolume(wf, grid, geometry)
+                integral, idx= integrateOverVolume(wf, grid, geometry, idx)
             else:
                 raise Exception("You must specify a geometry to define the integration volume.")
                  
