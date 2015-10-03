@@ -28,7 +28,7 @@ bands2h.py --help
 * [scipy](http://www.scipy.org)
 
 ## wfcutter.py
-This utility allow to analyze wavefunctions (vtk format) performing post-processing and visualization routines.  
+This utility allow to analyze wavefunctions and density obtained with octopus integrating the charge over volumes defined as the union of basic shapes.It also provides a basic interface to visualize the data and the integration volume.    
 
 #### Examples
 To integrate a real wavefunction contained in ```file.vtk``` over a sphere of radius 10 centered in (0,0,0):
@@ -36,7 +36,6 @@ To integrate a real wavefunction contained in ```file.vtk``` over a sphere of ra
 wfcutter.py -g "sphere(0,0,0,10)" file.vtk
 
 ```
-
 
 To visualize an isosurface of the data and the integration volume (defined by two interloking spheres):
 ```

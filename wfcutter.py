@@ -307,7 +307,6 @@ def integrateOverVolume(func, grid, geometry, idxin = None):
     for idim in range(3):
         spacing[idim]= abs(tmp[idim][1]-tmp[idim][0])            
     
-    
 
     # print 'calculate mask'
     # mask = pointInVolume(grid.transpose(), geometry)
@@ -318,7 +317,7 @@ def integrateOverVolume(func, grid, geometry, idxin = None):
     if idxin is None:
         idx = np.array([], dtype=np.int)
 
-        start = time.time()
+        # start = time.time()
         res = 0
         for ip in range(func.shape[0]):
             pnt = [x[ip], y[ip], z[ip]]
@@ -327,20 +326,16 @@ def integrateOverVolume(func, grid, geometry, idxin = None):
                 idx =np.append(idx, ip)
                 res += func[ip]
 
-        end = time.time()
-        print "loop time %s"%(end - start)
+        # end = time.time()
+        # print "loop time %s"%(end - start)
     
         res *= np.prod(spacing)
     else:    
-        # print idx
         idx = idxin
-        start = time.time()
+        # start = time.time()
         res = func[idx].sum()*np.prod(spacing)
-        end = time.time()
-        print "masked sum time %s"%(end - start)
-        # print "value %s"%(msum)
-
-    # print "res %s"%(res)
+        # end = time.time()
+        # print "masked sum time %s"%(end - start)
     
     return (res, idx)
     
@@ -353,16 +348,26 @@ def main(args):
 
     VERSION = '0.0(alpha)'
     
-    desc="""This utility allow to analyze wavefunctions performing different post-processing 
-routines.        
+    desc="""This utility allow to analyze wavefunctions and density obtained with octopus 
+integrating the charge over volumes defined as the union of basic shapes.
+It also provides a basic interface to visualize the data and the integration volume.    
 """
 
     epilog="""Examples:
+To integrate a real wavefunction contained in file.vtk over a sphere of radius 10 
+centered in (0,0,0):
+\'%(prog)s -g "sphere(0,0,0,10)" file.vtk\'
 
-To process input file(s):
-\'%(prog)s file1 [file2 ...]\'
-\n\n
-    """
+
+To visualize an isosurface of the data and the integration volume (defined by two 
+interlocking spheres):
+\'%(prog)s -g "sph(0,0,0,10); sph(5,0,0,10)" -d file.vtk\'
+
+To process multiple files:
+\'%(prog)s file1 file2 [file3 ...]\'
+NOTE: to accelerate multiple files processing the code assumes the data contained 
+in each file to be defined on the same grid (the one provided by file1).
+"""
 
     parser = argparse.ArgumentParser(version='%s version %s' %(sys.argv[0],VERSION),
                                      description=desc,
@@ -372,8 +377,9 @@ To process input file(s):
 
     parser.add_argument('-g', '--geometry', action='store', metavar='sphere(cx,cy,cz,R) [;sphere ...]', default= None,
     help=
-""" Define the geometry where the charge is integrated. 
-The available geometries are sphere, cylinder and parallelepiped.
+"""Define the geometry where the charge is integrated. 
+The available geometries are sphere (cylinder and 
+parallelepiped yet to come).
 
 """)
 
@@ -384,7 +390,8 @@ The available geometries are sphere, cylinder and parallelepiped.
     
     parser.add_argument('--isolevel', type=float, metavar='float', default= 0.1,
     help=
-"""Define the value of at wich calculate the iso-surface (default 0.1).
+"""Define the value of at wich calculate the iso-surface 
+(default 0.1).
 """)
 
     parser.add_argument('file', nargs='+')
