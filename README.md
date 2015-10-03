@@ -1,6 +1,6 @@
 # Octopus scripts
 
-A collection of scripts to postprocess data generated whith Octopus (www.octopus-code.org), a highly scalable rea-space real-time TDDFT code.
+A collection of scripts to postprocess data generated whith [Octopus](http://www.tddft.org/programs/octopus/wiki/index.php/Main_Page), a highly scalable rea-space real-time TDDFT code.
 
 
 ## bands2h.py
