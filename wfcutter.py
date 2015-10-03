@@ -306,11 +306,7 @@ def integrateOverVolume(func, grid, geometry):
     tmp = [np.unique(x),np.unique(y),np.unique(z)]
     spacing=np.zeros(3)
     for idim in range(3):
-        spacing[idim]= abs(tmp[idim][1]-tmp[idim][0])
-        
-    if not all(x == spacing[0] for x in spacing):
-        raise Exception("Cannot integrate! The grid appears to be not equally spaced. \n %spacing"%(spacing))
-    
+        spacing[idim]= abs(tmp[idim][1]-tmp[idim][0])            
     
     
     res = np.zeros(len(geometry)+1)
@@ -350,11 +346,11 @@ def integrateOverVolume(func, grid, geometry):
     end = time.time()
     print "loop time %s"%(end - start)
     
-    res[:] = res[:]*spacing[0]**3
+    res[:] = res[:]*np.prod(spacing)
     
     # print idx
     start = time.time()
-    msum = func[idx].sum()*spacing[0]**3
+    msum = func[idx].sum()*np.prod(spacing)
     end = time.time()
     print "masked sum time %s"%(end - start)
     print "value %s"%(msum)
