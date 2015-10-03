@@ -33,6 +33,8 @@ from math import *
 
 import vtk
 
+import time
+
 
 # list of supported geometries
 geometries = ["sphere", 
@@ -186,7 +188,7 @@ def display_vtk(filename, geometry = None, isolevel = 0.1):
  
     
 
-def read_vtk(filename, skipGrid = False):
+def read_vtk(filename, skipGrid = False, reshape = False):
 
     reader = vtkStructuredPointsReader()
     reader.SetFileName(filename)
@@ -205,27 +207,30 @@ def read_vtk(filename, skipGrid = False):
     # print vec
     # print data.GetPointData()
 
-    u = VN.vtk_to_numpy(data.GetPointData().GetArray('scalar_field'))
-    # nodes_nummpy_array = VN.vtk_to_numpy(data.GetPoints().GetData())
-    # print nodes_nummpy_array
-    
-    u = u.reshape(dim,order='F')
+    try: 
+        u = VN.vtk_to_numpy(data.GetPointData().GetArray('Re'))
+    except AttributeError:
+        #older file format
+        u = VN.vtk_to_numpy(data.GetPointData().GetArray('scalar_field'))
+        
 
     x = np.zeros(data.GetNumberOfPoints())
     y = np.zeros(data.GetNumberOfPoints())
     z = np.zeros(data.GetNumberOfPoints())
 
     if not skipGrid:
-        # Looping over all the point takes a while so we can do ot only once
+        # Looping over all the point takes a while... perhaps there is a faster way
         for i in range(data.GetNumberOfPoints()):
                 x[i],y[i],z[i] = data.GetPoint(i)
-
-    x = x.reshape(dim,order='F')
-    y = y.reshape(dim,order='F')
-    z = z.reshape(dim,order='F')
+    
+    if reshape:
+        u = u.reshape(dim,order='F')
+        x = x.reshape(dim,order='F')
+        y = y.reshape(dim,order='F')
+        z = z.reshape(dim,order='F')
     
     
-    return (u, [x,y,z])
+    return (u, np.array([x,y,z]))
 
 def get_geometry(string):
     """ Parse geometry properties from sting"""
@@ -256,29 +261,62 @@ def get_geometry(string):
         
     return geometry    
 
-def pointInVolume(pnt, geo):
-    pnt = np.array(pnt, dtype=np.float)
+def pointInGeo(pnt, geo):
+    try: 
+        ismat = pnt.shape[1] > 0
+    except:
+        ismat = False
+        pnt = np.array(pnt, dtype=np.float)
+
     par = parameters[geometries.index(geo['shape'])]  
-    
     center = np.array(geo['parameters'][par['center'][0]:par['center'][1]], dtype=np.float)
-    
+
     if geo['shape'] == 'sphere': 
         d = pnt - center
         R2 = geo['parameters'][par['radius']]**2
         if (d.dot(d)<= R2):
             return True
+
+    return False
+
+def pointInVolume(pnt, geometry):
+    if isinstance(geometry, dict):
+        if (pointInGeo(pnt,geometry)):
+            return True        
+    else:
+        for geo in geometry:
+            if (pointInGeo(pnt,geo)):
+                return True
         
     return False 
     
 def integrateOverVolume(func, grid, geometry):
-    x = grid[0][:][:][:]
-    y = grid[1][:][:][:]
-    z = grid[2][:][:][:]
+    if False:
+        x = grid[0][:][:][:]
+        y = grid[1][:][:][:]
+        z = grid[2][:][:][:]
     
+        spacing=np.zeros(3)
+        spacing[0] = abs(x[1][0][0]-x[0][0][0])
+        spacing[1] = abs(y[0][1][0]-y[0][0][0])
+        spacing[2] = abs(z[0][0][1]-z[0][0][0])
+        
+    x = grid[0]
+    y = grid[1]
+    z = grid[2]
+    
+    print grid[:,0]
+    print x
+    print y
+    print z
+    print grid[0]
+    print grid[0,:]
+     
+    tmp = [np.unique(x),np.unique(y),np.unique(z)]
     spacing=np.zeros(3)
-    spacing[0] = abs(x[1][0][0]-x[0][0][0])
-    spacing[1] = abs(y[0][1][0]-y[0][0][0])
-    spacing[2] = abs(z[0][0][1]-z[0][0][0])
+    for idim in range(3):
+        spacing[idim]= abs(tmp[idim][1]-tmp[idim][0])
+    # print spacing
     
     # for idim in range(3):
     #     spacing[idim] = abs(grid[idim][1][0][0]-grid[idim][0][0][0])
@@ -287,23 +325,56 @@ def integrateOverVolume(func, grid, geometry):
     assert all(x == spacing[0] for x in spacing), "Cannot integrate! The grid appears to be not equally spaced."
     
     
-    res = np.zeros(len(geometry))
+    res = np.zeros(len(geometry)+1)
+
+    # print 'calculate mask'
+    # mask = pointInVolume(grid.transpose(),geometry)
+    # print mask
     
-    for i in range(x.shape[0]):
-        for j in range(y.shape[1]):
-            for k in range(z.shape[2]):
-                pnt = [x[i][j][k], y[i][j][k], z[i][j][k]]
-                
-                l=0
-                for geo in geometry:
-                    res[l] += (func[i][j][k]  if ( pointInVolume(pnt,geo)) else 0) 
-                    l += 1
+    idx = np.array([], dtype=np.int)
+
+    start = time.time()
+    # for k in range(z.shape[2]):
+    #     for j in range(y.shape[1]):
+    #         for i in range(x.shape[0]):
+    #             pnt = [x[i][j][k], y[i][j][k], z[i][j][k]]
+    #
+    #             l=0
+    #             for geo in geometry:
+    #                 res[l] += (func[i][j][k]  if ( pointInVolume(pnt,geo)) else 0)
+    #                 l += 1
+    #             if pointInVolume(pnt,geometry):
+    #                 idx =np.append(idx,[i,j,k])
+
+    for ip in range(func.shape[0]):
+        pnt = [x[ip], y[ip], z[ip]]
+        # pnt = grid[:,ip]
+        
+        ig=0
+        for geo in geometry: 
+            res[ig] += (func[ip]  if ( pointInVolume(pnt,geo)) else 0) 
+            ig += 1
+
+        if pointInVolume(pnt,geometry):
+            idx =np.append(idx, ip)
+            res[len(geometry)] += func[ip]
+
+    end = time.time()
+    print "loop time %s"%(end - start)
     
     res[:] = res[:]*spacing[0]**3
     
-    tot = sum(res[:])
+    # print idx
+    start = time.time()
+    msum = func[idx].sum()*spacing[0]**3
+    end = time.time()
+    print "masked sum time %s"%(end - start)
+    print "value %s"%(msum)
+        
+    tot = res[:len(geometry)].sum()
+    print "res %s"%(res[-1])
     
-    return (tot, res)
+    return tot
     
     
 ##############################################################    
@@ -364,8 +435,10 @@ The available geometries are sphere, cylinder and parallelepiped.
     for file in args.file: 
             if args.display:
                 display_vtk(file, geometry, args.isolevel)
-            if multiplefiles:    
-                (wf, ) =read_vtk(file, skipGrid = True)
+            if multiplefiles:   
+                #looping over all the points to get the grid takes a while.
+                # we save time by assuming subsequent files to have the same grid of the first one.
+                (wf, dummy) =read_vtk(file, skipGrid = True)
             else:    
                 (wf, grid) =read_vtk(file)
 
@@ -374,11 +447,8 @@ The available geometries are sphere, cylinder and parallelepiped.
             else:
                 raise Exception("You must specify a geometry to define the integration volume.")
                  
-            str = "%s\t%2.4e"%(file, integral[0])
-            if integral[1].shape[0] > 1:
-                for val in integral[1]:
-                    str += "\t%2.4e"%(val)
-            print str
+            print("%s\t%2.4e"%(file, integral))
+            
                 
             multiplefiles = True
 
