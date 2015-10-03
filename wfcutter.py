@@ -291,15 +291,6 @@ def pointInVolume(pnt, geometry):
     return False 
     
 def integrateOverVolume(func, grid, geometry):
-    if False:
-        x = grid[0][:][:][:]
-        y = grid[1][:][:][:]
-        z = grid[2][:][:][:]
-    
-        spacing=np.zeros(3)
-        spacing[0] = abs(x[1][0][0]-x[0][0][0])
-        spacing[1] = abs(y[0][1][0]-y[0][0][0])
-        spacing[2] = abs(z[0][0][1]-z[0][0][0])
         
     x = grid[0]
     y = grid[1]
@@ -316,13 +307,10 @@ def integrateOverVolume(func, grid, geometry):
     spacing=np.zeros(3)
     for idim in range(3):
         spacing[idim]= abs(tmp[idim][1]-tmp[idim][0])
-    # print spacing
-    
-    # for idim in range(3):
-    #     spacing[idim] = abs(grid[idim][1][0][0]-grid[idim][0][0][0])
-
         
-    assert all(x == spacing[0] for x in spacing), "Cannot integrate! The grid appears to be not equally spaced."
+    if not all(x == spacing[0] for x in spacing):
+        raise Exception("Cannot integrate! The grid appears to be not equally spaced. \n %spacing"%(spacing))
+    
     
     
     res = np.zeros(len(geometry)+1)
