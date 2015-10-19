@@ -346,7 +346,7 @@ def integrateOverVolume(func, grid, geometry, idxin = None):
 
 def main(args):
 
-    VERSION = '0.0(alpha)'
+    VERSION = '0.1 (alpha)'
     
     desc="""This utility allow to analyze wavefunctions and density obtained with octopus 
 integrating the charge over volumes defined as the union of basic shapes.
@@ -378,10 +378,16 @@ in each file to be defined on the same grid (the one provided by file1).
 
     parser.add_argument('-g', '--geometry', action='store', metavar='sphere(cx,cy,cz,R) [;sphere ...]', default= None,
     help=
-"""Define the geometry where the charge is integrated. 
-The available geometries are sphere (cylinder and 
-parallelepiped yet to come).
-
+"""Define the geometry where the charge is integrated
+which is created by the union of basic geometrical shapes.
+It can be specified as a string (i.e. within brackets "string") 
+containing the properties of each shape separated by a column 
+';'. Sphere is the only available shape for the moment (cylinder 
+and parallelepiped are in the plans). To define a shape 
+the syntax (not case-sensitive) is the following:
+'Sphere(Center_x, Center_y, Center_z, Radius)'
+Short names using the first 3 characters if the complete 
+function can be used to simplify.
 """)
 
 
