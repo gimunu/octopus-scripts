@@ -231,9 +231,9 @@ def slice_on_line(E, kmesh, dim, nk, p1, p2, len0, spacing = None):
     Eout = np.zeros([u.shape[0],1, nbands])
 
     # Generate the grid-points on the line 
-    kk = np.zeros([u.shape[0],3])
+    kk = np.zeros([u.shape[0],dim])
     for iu in range(u.shape[0]):
-        kk[iu,:] = np.array(line(v, p1 ,u[iu]))
+        kk[iu,:] = np.array(line(v, p1 ,u[iu])[0:dim])
 
     # Check that the requested points are within the bounds of the input grid
     if (not points_in_bounds(kk,grid_bounds(kmesh,dim))):
@@ -351,8 +351,8 @@ the minimum spacing of the input data.
             for i in range(pts.shape[0]-1):
                  p1 = pts[i,:]     
                  p2 = pts[i+1,:]                      
-                 print "Segment: %s --> %s"%(p1,p2)
-                 header = "#\n# Slice on a line segment connecting %s and %s \n#\n"%(p1,p2)
+                 print "Segment: %s --> %s"%(p1[0:dim],p2[0:dim])
+                 header = "#\n# Slice on a line segment connecting %s and %s \n#\n"%(p1[0:dim],p2[0:dim])
                  (E_,kx_,lenght) = slice_on_line(E, kmesh, dim, nk, p1, p2, lenght, spacing = args.spacing)
                  nk_ = np.array((kx_.shape[0],0,0))
                  kk = np.zeros([max(nk_[:]),3])
