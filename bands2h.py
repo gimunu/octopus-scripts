@@ -104,26 +104,6 @@ def import_file(fname, reduced = False):
             for m in range(kz.shape[0]):
                 E[i,j,m,:].sort()
 
-            
-    # if write_out:
-    #     out = open( fname+".gpl","w")
-    #
-    #     for i in range(kx.shape[0]):
-    #         if dim > 1:
-    #             for j in range(ky.shape[0]):
-    #                 out.write("%e\t%e"%(kx[i], ky[j]))
-    #                 for ie in range(nbands):
-    #                     out.write("\t%e"%(E[i,j,ie]))
-    #                 out.write("\n")
-    #         else:
-    #             out.write("%e"%(kx[i]))
-    #             for ie in range(nbands):
-    #                 out.write("\t%e"%(E[i,j,ie]))
-    #             out.write("\n")
-    #
-    #
-    #         if dim > 1: out.write("\n")
-    #     out.close()
     
     return (E, [kx, ky, kz], dim)
 
@@ -237,8 +217,8 @@ def slice_on_line(E, kmesh, dim, nk, p1, p2, len0, spacing = None):
 
     # Check that the requested points are within the bounds of the input grid
     if (not points_in_bounds(kk,grid_bounds(kmesh,dim))):
-        print('Error:Some of the requested output grid point is outside the bounds of the input grid.\nCurrent bounds are:\n%s'%grid_bounds(kmesh, dim))                
-        sys.exit(1)    
+        print('Error:Some of the requested output grid point is outside the bounds of the input grid.\nCurrent bounds are:\n%s'%grid_bounds(kmesh, dim))
+        sys.exit(1)
 
     #Loop over all the bands
     for ib in range(nbands):
@@ -292,14 +272,17 @@ Each segment is defined by two points p1=(p1x,p1y,p1z) and
 p2=(p2x,p2y,p2z) and is parametrized as following: 
 v = (p2-p1) * t + p1.
 The coordinates of each point are passed as a string in a 
-column-separated triplet. For example:
+column-separated triplet. By default reduced coordinate
+units are use so each point coordinate should vary 
+between []-1/2,1,2]. 
+For example:
 
 -c "p1x,p1y,p1z;p1x,p1y,p1z;[...]" 
 
 Point coordinates can also be expressed as mathematical 
 formula such as:
 
--c "0, 0, 0 ; 1/2, cos(pi/4), sin(pi/4); 1, 1, 1"
+-c "0, 0, 0 ; 1/2, cos(pi/4)/2, sin(pi/4)/4; 0.5, 0.5, 0.5"
 
 """)                      
 
@@ -310,8 +293,8 @@ the minimum spacing of the input data.
 """    
     )
     
-    parser.add_argument('-r','--reduced', action="store_true", default=False, 
-    help="Use reduced coordinates in reciprocal space.")
+    parser.add_argument('--absolute', action="store_true", default=False, 
+    help="Use absolute coordinates in reciprocal space.")
     
     
 
@@ -339,7 +322,7 @@ the minimum spacing of the input data.
             # dir = np.array(args.cut.split(','),dtype=float)
         
         # (E,kx,ky) = import_file(file, write_out = (dir is None))
-        (E,kmesh,dim) = import_file(file,args.reduced)
+        (E,kmesh,dim) = import_file(file,not args.absolute)
         nk = np.zeros(3)
         nk = [kmesh[0].shape[0],kmesh[1].shape[0],kmesh[2].shape[0]]
                     
