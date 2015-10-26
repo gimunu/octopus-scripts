@@ -325,9 +325,10 @@ the minimum spacing of the input data.
         (E,kmesh,dim) = import_file(file,not args.absolute)
         nk = np.zeros(3)
         nk = [kmesh[0].shape[0],kmesh[1].shape[0],kmesh[2].shape[0]]
-                    
-        header = None
+                
+        header = "# This file contains %s bands.\n"%(E.shape[3])
         if args.cut is not None:
+            header = "%s# Bands are evaluated along the following path in the Brillouin zone:\n# %s\n"%(header,args.cut)
             file = file+".cut"
             append = False
             lenght = 0.0
@@ -335,7 +336,7 @@ the minimum spacing of the input data.
                  p1 = pts[i,:]     
                  p2 = pts[i+1,:]                      
                  print "Segment: %s --> %s"%(p1[0:dim],p2[0:dim])
-                 header = "#\n# Slice on a line segment connecting %s and %s \n#\n"%(p1[0:dim],p2[0:dim])
+                 header = "%s#\n# Slice on a line segment connecting %s and %s \n#\n"%(header,p1[0:dim],p2[0:dim])
                  (E_,kx_,lenght) = slice_on_line(E, kmesh, dim, nk, p1, p2, lenght, spacing = args.spacing)
                  nk_ = np.array((kx_.shape[0],0,0))
                  kk = np.zeros([max(nk_[:]),3])
