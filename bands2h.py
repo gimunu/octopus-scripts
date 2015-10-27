@@ -33,12 +33,48 @@ except ImportError:
     print "scipy is not installed"
 
 
-
 from math import *
+import os
+
+import warnings
+warnings.simplefilter('error', UserWarning)
 
 
+def have_kpoint_symmetries(file):
+    path = os.path.dirname(os.path.abspath(file))
+    if "static" in path:
+        path = path +"/../"
 
-def import_file(fname, reduced = False):
+
+    def search_string_in_file(string, f):
+        if f is not None:
+            for line in f:
+                if string.lower() in line.lower():
+                    return line
+    
+        return None
+
+    # Look for clues on symmetry being used to generate the k-point mesh
+    try: 
+        filename = path + "/inp"
+        f = open(filename)
+    except:
+        f = None
+    if search_string_in_file("KpointsUseSymmetries",f):
+        return True
+
+    try:
+        filename = path + "/static/info"
+        f = open(filename)
+    except:
+        f = None
+
+    if search_string_in_file("symmetry-reduced k-points",f):
+        return True
+
+    return False     
+        
+def import_bands_file(fname, reduced = False):
 
     bands = np.loadtxt(fname)
 
@@ -307,10 +343,23 @@ the minimum spacing of the input data.
     
     
     for file in args.file: 
+
+        if have_kpoint_symmetries(file):
+            warnings.warn(
+""" 
+ It seems that the k-point grid has been generated using symmetries.
+ Since symmetries are not supported by this program the result are likely to 
+ be garbage.
+"""                
+            )
         
+        # (E,kx,ky) = import_file(file, write_out = (dir is None))
+        (E,kmesh,dim) = import_bands_file(file,not args.absolute)
+        nk = np.zeros(3)
+        nk = [kmesh[0].shape[0],kmesh[1].shape[0],kmesh[2].shape[0]]
+
+        # parse the cut nodal points
         if args.cut is not None:
-            # string = args.cut.replace(" ", "")
-            # tokens = np.array(string.split(';'))
             tokens = np.array(args.cut.split(';'))
             pts = np.zeros((tokens.shape[0],3))
             for i in range(tokens.shape[0]):
@@ -321,10 +370,6 @@ the minimum spacing of the input data.
             # print pts.shape[:]
             # dir = np.array(args.cut.split(','),dtype=float)
         
-        # (E,kx,ky) = import_file(file, write_out = (dir is None))
-        (E,kmesh,dim) = import_file(file,not args.absolute)
-        nk = np.zeros(3)
-        nk = [kmesh[0].shape[0],kmesh[1].shape[0],kmesh[2].shape[0]]
                 
         header = "# This file contains %s bands.\n"%(E.shape[3])
         if args.cut is not None:
@@ -345,8 +390,9 @@ the minimum spacing of the input data.
                  
         
                  write_gpl(file, E_, kk, nk_, header, append = append)
+                 header = ""
                  append = True
-        else:
+        elif dim <= 2:
             E_ = E[:,:,0,:]        
             kk = np.zeros([max(nk[:]),3])
             kk[0:nk[0],0] = kmesh[0][0:nk[0]]
