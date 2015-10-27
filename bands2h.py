@@ -55,6 +55,14 @@ def have_kpoint_symmetries(file):
         return None
 
     # Look for clues on symmetry being used to generate the k-point mesh
+    try:
+        filename = path + "/static/info"
+        f = open(filename)
+    except:
+        f = None
+    if search_string_in_file("symmetry-reduced k-points",f):
+        return True
+
     try: 
         filename = path + "/inp"
         f = open(filename)
@@ -63,14 +71,6 @@ def have_kpoint_symmetries(file):
     if search_string_in_file("KpointsUseSymmetries",f):
         return True
 
-    try:
-        filename = path + "/static/info"
-        f = open(filename)
-    except:
-        f = None
-
-    if search_string_in_file("symmetry-reduced k-points",f):
-        return True
 
     return False     
         
