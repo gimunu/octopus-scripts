@@ -383,7 +383,7 @@ the minimum spacing of the input data.
             warnings.warn(
 """
  It seems that the k-point grid has been generated using symmetries.
- Since symmetries are not supported by this program the result are likely to
+ Since symmetries are not supported by this program the results are likely to
  be garbage.
 """
             )
