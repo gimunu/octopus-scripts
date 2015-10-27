@@ -46,12 +46,12 @@ def get_prj_root_from_file(file):
 
     return path
 
-def search_string_in_file(string, f):
+def search_string_in_file(string, f, rewind = True):
     if f is not None:
-        il = 0
-        for line in f:
-            il += 1
+        for il, line in enumerate(f):
             if string.lower() in line.lower():
+                if rewind:
+                    f.seek(0, 0)
                 return il, line
 
     return None
@@ -93,16 +93,135 @@ def get_kmesh_from_info(path):
         f = open(fname)
     except:
         return None 
+        
+    # il, line= search_string_in_file("Dimensions of the k-point grid", f)
+    # print il
+    # nk = line.split('=')[1].strip(' \t\n\r').split()
+    # print nk
+
+    # Don't proceed any further if symmetries have been used
+    if search_string_in_file("symmetry-reduced k-points",f):
+        f.close()
+        return None
+        
+    il, line= search_string_in_file("Total number of k-points", f)
+    nk = int(line.split('=')[1].strip(' \n'))
+    
+    kmesh = np.array([], dtype=np.float)
+    ilstart = il + 5 
+    ilend   = ilstart + nk
+    for i, line in enumerate(f):
+        if i > ilstart and i < ilend :
+            kmesh = np.append(kmesh, line.strip(' \n').split())
+    
+    print kmesh
     f.close()
+    return kmesh
 
 
 def import_eigenvalues_file(fname):
-    get_kmesh_from_info(get_prj_root_from_file(fname))
+    kmesh_list = get_kmesh_from_info(get_prj_root_from_file(fname))
+    
+    if kmesh_list is None:
+        pass
+    
     
     f = open(fname)
-    print f.readline()
-    f.close()
+    lstart, line = search_string_in_file("#k =", f, rewind = False)
+    # print line.strip(' \n)').split()[6:9]
+
+    nbands, line = search_string_in_file("#k =", f)
+    # print line.strip(' \n)').split()[2]
+    # print line.strip(' \n)').split()[6:9]
+    # print nbands
+    
+    for il, line in enumerate(f):
+        if il == lstart + 1:
+
+            if len(line.split()) == 8:
+                #spinors
+                 idx = [2,4,5,6]
+            else:
+                if line.split()[1] == "--":
+                    #spin unpolarized
+                    idx = [2]
+                else:
+                    #spin polarized
+                    idx = [2,1]
+    f.seek(0,0)
+    
+    # while True:
+    #     try:
+    #         il, line = search_string_in_file("#k =", f, rewind = False)
+    #     except:
+    #         break
+    #     # if line is None:
+    #     #     break
+    #     # ik = line.strip(' \n)').split()[2]
+    #     k = line.strip(' \n)').split()[6:9]
+    #     # k.append(ik)
+    #     # print k
+    #     kmesh = np.append(kmesh, k)
+    
+    lstart, line = search_string_in_file("#k =", f, rewind = False)
+    k = line.strip(' \n)').split()[6:9]
+    for i,kk in enumerate(k):
+        k[i] = float(kk.strip(','))
+    kmesh  = np.array(k, dtype=np.float)
+    # kmesh = np.vstack((kmesh, k))
+
+    E  = np.array([], dtype=np.float)
+
+    ist = nbands
+    for il, line in enumerate(f):
+        if ist > 0:
+            ist -= 1
+            
+            # print len(line.split())
+            # print line.split()
         
+            # E = np.append(E, np.array(line.split())[idx])
+            E = np.append(E, float(line.split()[2]))
+        else:     
+            k = line.strip(' \n)').split()[6:9]
+            for i,kk in enumerate(k):
+                k[i] = float(kk.strip(','))
+            # print k
+            # kmesh = np.append(kmesh, k)
+            kmesh = np.vstack((kmesh, k))
+            ist = nbands 
+
+    print E
+    print kmesh.shape            
+    print kmesh
+    f.close()
+    
+    (kx,ky,kz,dim) = refine_dims_and_ks(kmesh[:,0],kmesh[:,1],kmesh[:,2], dim = 3)
+    print E.shape[:], kx.shape[0],ky.shape[0],kz.shape[0]
+    E = np.reshape(E,(kx.shape[0],ky.shape[0],kz.shape[0],nbands)) 
+
+    return (E, [kx, ky, kz], dim)
+
+  
+def refine_dims_and_ks(kx,ky,kz, dim):
+
+    # get unique k-point elements along the axes
+    kx = np.unique(kx)
+    if dim > 1:
+        ky = np.unique(ky)
+        if dim > 2: 
+            kz = np.unique(kz)
+        else:
+            kz = np.array([0.0],dtype= np.float)            
+    else:
+        ky = np.array([0.0],dtype= np.float)
+        kz = np.array([0.0],dtype= np.float)
+        
+    if (kz.shape[0] == 1): dim = 2 # we are effectively 2D 
+    if (ky.shape[0] == 1 and kz.shape[0] == 1): dim = 1 # we are effectively 1D 
+
+    return (kx,ky,kz, dim)
+          
 def import_bands_file(fname, reduced = False):
 
     bands = np.loadtxt(fname)
@@ -125,22 +244,25 @@ def import_bands_file(fname, reduced = False):
     for l in range(bands.shape[0]):
         if ((bands[0,kcol0:kcol1]==bands[l,kcol0:kcol1]).all()): 
             nbands += 1
-    # get unique k-point elements along the axes
-    kx = np.unique(bands[:, kcol0 + 0])
-    if dim > 1:
-        ky = np.unique(bands[:, kcol0 + 1])
-        if dim > 2: 
-            kz = np.unique(bands[:, kcol0 + 2])
-        else:
-            kz = np.array([0.0],dtype= float)            
-    else:
-        ky = np.array([0.0],dtype= float)
-        kz = np.array([0.0],dtype= float)
-        
-    if (kz.shape[0] == 1): dim = 2 # we are effectively 2D 
-    if (ky.shape[0] == 1 and kz.shape[0] == 1): dim = 1 # we are effectively 1D 
+            
+    # # get unique k-point elements along the axes
+    # kx = np.unique(bands[:, kcol0 + 0])
+    # if dim > 1:
+    #     ky = np.unique(bands[:, kcol0 + 1])
+    #     if dim > 2:
+    #         kz = np.unique(bands[:, kcol0 + 2])
+    #     else:
+    #         kz = np.array([0.0],dtype= np.float)
+    # else:
+    #     ky = np.array([0.0],dtype= np.float)
+    #     kz = np.array([0.0],dtype= np.float)
+    #
+    # if (kz.shape[0] == 1): dim = 2 # we are effectively 2D
+    # if (ky.shape[0] == 1 and kz.shape[0] == 1): dim = 1 # we are effectively 1D
+    #
+    # print "Detected a %d-dimensional k-space with %d bands "%(dim, nbands)
 
-    print "Detected a %d-dimensional k-space with %d bands "%(dim, nbands)        
+    (kx,ky,kz,dim) = refine_dims_and_ks(bands[:, kcol0 + 0], bands[:, kcol0 + 1],bands[:, kcol0 + 2], dim)
 
 
     E  =  np.zeros((kx.shape[0],ky.shape[0],kz.shape[0],nbands))
@@ -398,6 +520,8 @@ the minimum spacing of the input data.
             except:
                 print('Error: Unrecognized input file %s.\nThe supported files are \'bands-gp.dat\' and \'eigenvalues\'.'%(file))
                 sys.exit(1)
+
+        print "Detected a %d-dimensional k-space with %d (%d x %d x %d) k-points and %d bands "%(dim,np.prod(E.shape[0:2]),E.shape[0],E.shape[1],E.shape[2],  E.shape[3])
              
         nk = np.zeros(3)
         nk = [kmesh[0].shape[0],kmesh[1].shape[0],kmesh[2].shape[0]]
@@ -409,7 +533,7 @@ the minimum spacing of the input data.
                 f = open(args.cut)
                 tokens=np.array(f.readline().split(';'))
             except:
-                # break option string    
+                # read from command line    
                 tokens = np.array(args.cut.split(';'))
             pts = np.zeros((tokens.shape[0],3))
             for i in range(tokens.shape[0]):
