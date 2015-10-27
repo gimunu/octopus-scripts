@@ -39,20 +39,30 @@ import os
 import warnings
 # warnings.simplefilter('error', UserWarning)
 
-
-def have_kpoint_symmetries(file):
+def get_prj_root_from_file(file):
     path = os.path.dirname(os.path.abspath(file))
     if "static" in path:
         path = path +"/../"
 
+    return path
 
-    def search_string_in_file(string, f):
-        if f is not None:
-            for line in f:
-                if string.lower() in line.lower():
-                    return line
-    
-        return None
+def search_string_in_file(string, f):
+    if f is not None:
+        il = 0
+        for line in f:
+            il += 1
+            if string.lower() in line.lower():
+                return il, line
+
+    return None
+
+def have_kpoint_symmetries(file):
+    # path = os.path.dirname(os.path.abspath(file))
+    # if "static" in path:
+    #     path = path +"/../"
+    path = get_prj_root_from_file(file)
+
+
 
     # Look for clues on symmetry being used to generate the k-point mesh
     try:
@@ -61,6 +71,7 @@ def have_kpoint_symmetries(file):
     except:
         f = None
     if search_string_in_file("symmetry-reduced k-points",f):
+        f.close()
         return True
 
     try: 
@@ -69,14 +80,28 @@ def have_kpoint_symmetries(file):
     except:
         f = None
     if search_string_in_file("KpointsUseSymmetries",f):
+        f.close()
         return True
 
 
     return False     
 
+
+def get_kmesh_from_info(path):
+    fname = path +"./static/info"
+    try:
+        f = open(fname)
+    except:
+        return None 
+    f.close()
+
+
 def import_eigenvalues_file(fname):
-    pass
+    get_kmesh_from_info(get_prj_root_from_file(fname))
     
+    f = open(fname)
+    print f.readline()
+    f.close()
         
 def import_bands_file(fname, reduced = False):
 
@@ -325,6 +350,11 @@ formula such as:
 
 -c "0, 0, 0 ; 1/2, cos(pi/4)/2, sin(pi/4)/4; 0.5, 0.5, 0.5"
 
+optionally the string can be stored on a file and given as 
+option:
+
+-c path_file 
+
 """)                      
 
     parser.add_argument('--spacing', type=float, metavar='float', default= None, 
@@ -374,7 +404,13 @@ the minimum spacing of the input data.
 
         # parse the cut nodal points
         if args.cut is not None:
-            tokens = np.array(args.cut.split(';'))
+            try:
+                # read from file
+                f = open(args.cut)
+                tokens=np.array(f.readline().split(';'))
+            except:
+                # break option string    
+                tokens = np.array(args.cut.split(';'))
             pts = np.zeros((tokens.shape[0],3))
             for i in range(tokens.shape[0]):
                 coords  = tokens[i].split(',')
