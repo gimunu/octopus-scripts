@@ -73,6 +73,10 @@ def have_kpoint_symmetries(file):
 
 
     return False     
+
+def import_eigenvalues_file(fname):
+    pass
+    
         
 def import_bands_file(fname, reduced = False):
 
@@ -323,7 +327,7 @@ formula such as:
 
 """)                      
 
-    parser.add_argument('-d', '--spacing', type=float, metavar='float', default= None, 
+    parser.add_argument('--spacing', type=float, metavar='float', default= None, 
     help=
 """Define the output grid spacing. The default value is 
 the minimum spacing of the input data.
@@ -357,7 +361,7 @@ the minimum spacing of the input data.
         if file.lower() == "bands-gp.dat":
             (E,kmesh,dim) = import_bands_file(file,not args.absolute)
         elif file.lower() == "eigenvalues":     
-            (E,kmesh,dim) = import_bands_file(file,not args.absolute)            
+            (E,kmesh,dim) = import_eigenvalues_file(file)            
         else:
             try: 
                 (E,kmesh,dim) = import_bands_file(file,not args.absolute)
