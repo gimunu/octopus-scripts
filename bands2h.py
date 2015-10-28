@@ -134,7 +134,8 @@ def import_eigenvalues_file(fname):
     # print line.strip(' \n)').split()[2]
     # print line.strip(' \n)').split()[6:9]
     # print nbands
-    
+
+    # Figure out spin polarization
     for il, line in enumerate(f):
         if il == lstart + 1:
 
@@ -149,31 +150,23 @@ def import_eigenvalues_file(fname):
                     #spin polarized
                     idx = [2,1]
     f.seek(0,0)
-    
-    # while True:
-    #     try:
-    #         il, line = search_string_in_file("#k =", f, rewind = False)
-    #     except:
-    #         break
-    #     # if line is None:
-    #     #     break
-    #     # ik = line.strip(' \n)').split()[2]
-    #     k = line.strip(' \n)').split()[6:9]
-    #     # k.append(ik)
-    #     # print k
-    #     kmesh = np.append(kmesh, k)
+
     
     lstart, line = search_string_in_file("#k =", f, rewind = False)
     k = line.strip(' \n)').split()[6:9]
     for i,kk in enumerate(k):
-        k[i] = float(kk.strip(','))
+        k[i] = np.float(kk.strip(','))
     kmesh  = np.array(k, dtype=np.float)
     # kmesh = np.vstack((kmesh, k))
 
     E  = np.array([], dtype=np.float)
 
     ist = nbands
+    skip = True
     for il, line in enumerate(f):
+        if line == "\n":
+            break
+            
         if ist > 0:
             ist -= 1
             
@@ -181,24 +174,32 @@ def import_eigenvalues_file(fname):
             # print line.split()
         
             # E = np.append(E, np.array(line.split())[idx])
-            E = np.append(E, float(line.split()[2]))
+            E = np.append(E, np.float(line.split()[2]))
+            if skip:
+                skip = False
+            else:
+                kmesh = np.vstack((kmesh, k))
         else:     
-            k = line.strip(' \n)').split()[6:9]
+            # k = line.strip(' \n)').split()[6:9]
+            k = line.strip(' \n)').split("=")[2].split()[1:4]
             for i,kk in enumerate(k):
-                k[i] = float(kk.strip(','))
+                k[i] = np.float(kk.strip(','))
             # print k
+                
             # kmesh = np.append(kmesh, k)
-            kmesh = np.vstack((kmesh, k))
+            # kmesh = np.vstack((kmesh, k))
             ist = nbands 
 
-    print E
-    print kmesh.shape            
-    print kmesh
+    # print E
+    # print kmesh.shape
+    # print kmesh
     f.close()
     
     (kx,ky,kz,dim) = refine_dims_and_ks(kmesh[:,0],kmesh[:,1],kmesh[:,2], dim = 3)
-    print E.shape[:], kx.shape[0],ky.shape[0],kz.shape[0]
-    E = np.reshape(E,(kx.shape[0],ky.shape[0],kz.shape[0],nbands)) 
+    # print E.shape[:], kx.shape[0],ky.shape[0],kz.shape[0]
+    # E = np.reshape(E,(kx.shape[0],ky.shape[0],kz.shape[0],nbands))
+    
+    E = get_Eijm_from_bands (kx,ky,kz, kmesh, nbands, E, dim)
 
     return (E, [kx, ky, kz], dim)
 
@@ -221,6 +222,36 @@ def refine_dims_and_ks(kx,ky,kz, dim):
     if (ky.shape[0] == 1 and kz.shape[0] == 1): dim = 1 # we are effectively 1D 
 
     return (kx,ky,kz, dim)
+
+def get_Eijm_from_bands (kx,ky,kz,kmesh, nbands, bands, dim):
+    
+    E  =  np.zeros((kx.shape[0],ky.shape[0],kz.shape[0],nbands))
+    nnE = np.zeros((kx.shape[0],ky.shape[0],kz.shape[0],nbands),dtype= int)
+    nnE[:,:,:] = nbands-1
+
+    for l in range(bands.shape[0]):
+        k=kmesh[l,:]
+        i = np.where(kx == k[0])
+        if dim > 1:
+            j = np.where(ky == k[1])
+            if dim > 2:
+                m = np.where(kz == k[2])
+            else:
+                m = 0                 
+        else:
+            j = 0
+            m = 0  
+        E[i,j,m, nnE[i,j,m]] = bands[l]
+        nnE[i,j,m] -= 1
+        
+
+
+    for i in range(kx.shape[0]):
+        for j in range(ky.shape[0]):
+            for m in range(kz.shape[0]):
+                E[i,j,m,:].sort()
+
+    return E
           
 def import_bands_file(fname, reduced = False):
 
@@ -265,32 +296,34 @@ def import_bands_file(fname, reduced = False):
     (kx,ky,kz,dim) = refine_dims_and_ks(bands[:, kcol0 + 0], bands[:, kcol0 + 1],bands[:, kcol0 + 2], dim)
 
 
-    E  =  np.zeros((kx.shape[0],ky.shape[0],kz.shape[0],nbands))
-    nnE = np.zeros((kx.shape[0],ky.shape[0],kz.shape[0],nbands),dtype= int)
-    nnE[:,:,:] = nbands-1
 
-    for l in range(bands.shape[0]):
-        k=bands[l,kcol0:kcol1]
-        i = np.where(kx == k[0])
-        if dim > 1:
-            j = np.where(ky == k[1])
-            if dim > 2:
-                m = np.where(kz == k[2])
-            else:
-                m = 0                 
-        else:
-            j = 0
-            m = 0  
-        E[i,j,m, nnE[i,j,m]] = bands[l,ecol]
-        nnE[i,j,m] -= 1
-        
-
-
-    for i in range(kx.shape[0]):
-        for j in range(ky.shape[0]):
-            for m in range(kz.shape[0]):
-                E[i,j,m,:].sort()
-
+    # E  =  np.zeros((kx.shape[0],ky.shape[0],kz.shape[0],nbands))
+    # nnE = np.zeros((kx.shape[0],ky.shape[0],kz.shape[0],nbands),dtype= int)
+    # nnE[:,:,:] = nbands-1
+    #
+    # for l in range(bands.shape[0]):
+    #     k=bands[l,kcol0:kcol1]
+    #     i = np.where(kx == k[0])
+    #     if dim > 1:
+    #         j = np.where(ky == k[1])
+    #         if dim > 2:
+    #             m = np.where(kz == k[2])
+    #         else:
+    #             m = 0
+    #     else:
+    #         j = 0
+    #         m = 0
+    #     E[i,j,m, nnE[i,j,m]] = bands[l,ecol]
+    #     nnE[i,j,m] -= 1
+    #
+    #
+    #
+    # for i in range(kx.shape[0]):
+    #     for j in range(ky.shape[0]):
+    #         for m in range(kz.shape[0]):
+    #             E[i,j,m,:].sort()
+    
+    E = get_Eijm_from_bands (kx,ky,kz, bands[:,kcol0:kcol1], nbands, bands[:,ecol], dim)
     
     return (E, [kx, ky, kz], dim)
 
@@ -436,7 +469,7 @@ def main(args):
     
     desc="""This utility converts the bands structure file generated by Octopus 
 into a human-readable and easy-to-plot format.  
-The supported files include 'bands-gp.dat' and 'eigenvalues'.
+The supported files include 'bands-gp.dat', 'eigenvalues', and 'info'.
 """
 
     epilog="""Examples:
@@ -513,6 +546,8 @@ the minimum spacing of the input data.
         if file.lower() == "bands-gp.dat":
             (E,kmesh,dim) = import_bands_file(file,not args.absolute)
         elif file.lower() == "eigenvalues":     
+            (E,kmesh,dim) = import_eigenvalues_file(file)            
+        elif file.lower() == "info":     
             (E,kmesh,dim) = import_eigenvalues_file(file)            
         else:
             try: 
