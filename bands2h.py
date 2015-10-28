@@ -566,10 +566,12 @@ the minimum spacing of the input data.
             try:
                 # read from file
                 f = open(args.cut)
-                tokens=np.array(f.readline().split(';'))
+                path_string = f.readline()
+                f.close()
             except:
-                # read from command line    
-                tokens = np.array(args.cut.split(';'))
+                # read from command line  
+                path_string = args.cut  
+            tokens = np.array(path_string.split(';'))
             pts = np.zeros((tokens.shape[0],3))
             for i in range(tokens.shape[0]):
                 coords  = tokens[i].split(',')
@@ -582,7 +584,7 @@ the minimum spacing of the input data.
                 
         header = "# This file contains %s bands.\n"%(E.shape[3])
         if args.cut is not None:
-            header = "%s# Bands are evaluated along the following path in the Brillouin zone:\n# %s\n"%(header,args.cut)
+            header = "%s# Bands are evaluated along the following path in the Brillouin zone:\n# %s\n"%(header,path_string.strip("\n"))
             file = file+".cut"
             append = False
             lenght = 0.0
