@@ -46,9 +46,11 @@ def get_prj_root_from_file(file):
 
     return path
 
-def search_string_in_file(string, f, rewind = True):
+def search_string_in_file(string, f, rewind = True, commentchar = None):
     if f is not None:
         for il, line in enumerate(f):
+            if line[0] == commentchar:
+                continue
             if string.lower() in line.lower():
                 if rewind:
                     f.seek(0, 0)
@@ -118,9 +120,44 @@ def get_kweight_from_info(path):
     f.close()
     return kweight
 
-def find_custom_kpoint_indices(path):
+def get_kweight_from_inp(path):
+    fname = path +"./inp"
+    
+    try:
+        f = open(fname)
+    except:
+        return None 
+    
+    istart, line= search_string_in_file("KPointsReduced", f, commentchar = '#',rewind = False)
+    iend, line= search_string_in_file("%", f)
+
+    iend = istart + iend + 1
+    # print istart
+    # print iend
+
+    kweight = np.array([], dtype=np.float)
+    for i, line in enumerate(f):
+     if i > istart and i < iend :
+         kweight = np.append(kweight, np.float(line.strip(' \n').split('|')[0]))
+    f.close()
+    
+    kweight = kweight if kweight.shape[0] > 0 else None
+    return kweight
+     
+
+
+def find_custom_kpoint_indices(path, nk):
     kweight = None
-    if kweight is None:
+    
+    kweight = get_kweight_from_inp(path)
+    if kweight is not None:
+        # if np.count_nonzero(kweight) == 0 :
+        #     # it means that the userdefined kpoints only contain the zero-weight path
+        #     n0 = kweight.shape[0]
+        #     kweight = np.zeros(nk)
+        #     kweight[0:nk-n0] = 1
+        pass
+    else:
         kweight = get_kweight_from_info(path)
 
     # Indices with non-zero weight 
@@ -169,7 +206,7 @@ def import_eigenvalues_file(fname):
     kidx = np.array([ik], dtype = np.int)
     # kmesh = np.vstack((kmesh, k))
 
-    print len(sidx)
+    # print len(sidx)
     
     E  = np.array([], dtype=np.float)
 
@@ -212,23 +249,20 @@ def import_eigenvalues_file(fname):
             ist = nbands 
 
     # print kidx
-    # print E
+    # print E.shape
     # print kmesh.shape
     # print kmesh
-    print spin
+    # print spin
 
     f.close()
     
     # find_custom_kpoint_indices(get_prj_root_from_file(fname))
-    idx0  = find_custom_kpoint_indices(get_prj_root_from_file(fname))
+    idx0  = find_custom_kpoint_indices(get_prj_root_from_file(fname), kmesh.shape[0])
     if len(idx0)>0:
-        print idx0
-        # print kidx
-        # print np.where(kidx == 100)
+        # print idx0
         # generate a mask indicating the indices of kidx that are contained in idx0 
         mask = np.in1d(kidx, idx0)
         # print mask[np.where(kidx == 100)]
-        # print mask.shape, kidx.shape, kmesh.shape
         E0 = E[mask]
         kmesh0 = kmesh[mask,:]
         if len(sidx):
@@ -253,10 +287,17 @@ def import_eigenvalues_file(fname):
     
     
     if len(idx0)>0:
-        (kx0,ky0,kz0,dim0) = refine_dims_and_ks(kmesh0[:,0],kmesh0[:,1],kmesh0[:,2], dim = 3)
-        E0 = get_Eijm_from_bands (kx0,ky0,kz0, kmesh0, nbands, E0, dim0, spin0)
-    
-        return (E, [kx, ky, kz], dim, E0, kmesh0)
+        # (kx0,ky0,kz0,dim0) = refine_dims_and_ks(kmesh0[:,0],kmesh0[:,1],kmesh0[:,2], dim = 3)
+        # E0 = get_Eijm_from_bands (kx0,ky0,kz0, kmesh0, nbands, E0, dim0, spin0)
+        #
+        # return (E, [kx, ky, kz], dim, E0, [kx0, ky0, kz0])
+        for idim in range(3):
+            E0 = np.vstack((E0,spin0[:,idim]))
+        E0 = np.transpose(E0)
+        # print E0.shape
+        # print kmesh0.shape
+        # print E0
+        return (E, [kx, ky, kz], dim, E0, kmesh0, nbands)
 
     return (E, [kx, ky, kz], dim)
 
@@ -317,7 +358,7 @@ def get_Eijm_from_bands (kx,ky,kz,kmesh, nbands, bands, dim, other = None ):
     for i in range(kx.shape[0]):
         for j in range(ky.shape[0]):
             for m in range(kz.shape[0]):
-                print E[i,j,m, 0 ,:]
+                # print E[i,j,m, 0 ,:]
                 # E[i,j,m,:].sort()
                 E[i,j,m,:,:] = E[i,j,m, np.argsort(E[i,j,m,:,0])]
                 # print E[i,j,m, 0 ,:]
@@ -501,7 +542,7 @@ def slice_on_line(E, kmesh, dim, nk, p1, p2, len0, spacing = None):
     u = np.linspace(0, 1, num = length/du)
     # print u
     
-    Eout = np.zeros([u.shape[0],1, nbands, E.shape[3]])
+    Eout = np.zeros([u.shape[0],1, nbands, E.shape[4]])
 
     # Generate the grid-points on the line 
     kk = np.zeros([u.shape[0],dim])
@@ -610,7 +651,7 @@ the minimum spacing of the input data.
 
         if have_kpoint_symmetries(file):
             warnings.warn(
-"""
+""""
  It seems that the k-point grid has been generated using symmetries.
  Since symmetries are not supported by this program the results are likely to
  be garbage.
@@ -697,6 +738,71 @@ the minimum spacing of the input data.
             write_gpl(file, E_, kk, nk, header)
         
         
+        if len(imported) > 3:
+            # We have a zero-weight path
+            file = file+".cut0"
+
+            E0     = imported[3]
+            kmesh0 = imported[4]
+            nbands = imported[5]
+            
+            
+            print kmesh0.shape[0]/nbands
+            nk_ = np.array([int(kmesh0.shape[0]/nbands), 0, 0])
+            kk = np.zeros([nk_[0],3])
+            E_ = np.zeros([nk_[0],1, nbands, E0.shape[1]])
+            
+            def ll(i,j):
+                return i*nbands + j
+            
+            for i in range(nk_[0]):
+                for j in range(nbands):
+                    l = i*nbands + j
+                    E_[i,0,j,:] = E0[ll(i,j),:]    
+                if i > 0:                    
+                    dk = np.sqrt(np.sum((kmesh0[ll(i,j),:]-kmesh0[ll(i-1,j),:])**2))
+                    kk[i] = kk[i-1] + dk
+                    print dk, ll(i,j), kmesh0[l,:]-kmesh0[l-1,:]
+
+
+            # print len(kmesh0[0]),len(kmesh0[1])
+            # # print E.shape
+            # # print E_.shape
+            # # print kk.shape
+            # # print kmesh0[0].shape[0], kmesh0[1].shape[0], kmesh0[2].shape[0]
+            # print E0.shape
+            # # print E_[0,0,0,0]
+            # # print E0[0,0,0,0,0]
+            #
+            # nk_ = np.array([len(kmesh0[0])*len(kmesh0[1])*len(kmesh0[2]), 0, 0])
+            # kk = np.zeros([nk_[0],3])
+            # E_ = np.zeros([nk_[0],1, E0.shape[3], E0.shape[4]])
+            #
+            #
+            # il = 0
+            # for i in range(len(kmesh0[0])):
+            #     for j in range(len(kmesh0[1])):
+            #         for m in range(len(kmesh0[2])):
+            #
+            #             k2 = np.array([kmesh0[0][i],kmesh0[1][j],kmesh0[2][m] ])
+            #
+            #             if il > 0 :
+            #                 # print kmesh0[0]
+            #                 # k1 = np.array(kmesh0[il][:], dtype=np.float)
+            #                 # k2 = np.array(kmesh0[il-1,:], dtype=np.float)
+            #                 dk = np.sqrt(np.sum((k2[:]-k1[:])**2))
+            #                 kk[il] = kk[il-1] + dk
+            #
+            #             E_[il,0,:,:] = E0[i,j,m,:,:]
+            #
+            #             k1 = k2
+            #             il += 1
+            
+            
+            print "Detected a zero-weight path (%d points) in k-space with %d bands"%(kk.shape[0], nbands )
+            header = "# Zero-weight path in k-space (%d points) with %d bands\n"%(kk.shape[0], nbands)
+            
+            write_gpl(file,E_, kk, nk_, header)
 
     
 
