@@ -63,12 +63,8 @@ def search_string_in_file(string, f, rewind = True, commentchar = None):
     return None
 
 def have_kpoint_symmetries(file):
-    # path = os.path.dirname(os.path.abspath(file))
-    # if "static" in path:
-    #     path = path +"/../"
+
     path = get_prj_root_from_file(file)
-
-
 
     # Look for clues on symmetry being used to generate the k-point mesh
     try:
@@ -88,7 +84,6 @@ def have_kpoint_symmetries(file):
     if search_string_in_file("KpointsUseSymmetries",f):
         f.close()
         return True
-
 
     return False     
 
@@ -114,9 +109,7 @@ def get_kweight_from_info(path):
     ilend   = ilstart + nk + 1
     for i, line in enumerate(f):
         if i > ilstart and i < ilend :
-            # print line.strip(' \n').split()
             kweight = np.append(kweight, np.float(line.strip(' \n').split()[4]))
-    # print kweight
     f.close()
     return kweight
 
@@ -132,8 +125,6 @@ def get_kweight_from_inp(path):
     iend, line= search_string_in_file("%", f)
 
     iend = istart + iend + 1
-    # print istart
-    # print iend
 
     kweight = np.array([], dtype=np.float)
     for i, line in enumerate(f):
@@ -160,9 +151,6 @@ def find_custom_kpoint_indices(path, nk):
     else:
         kweight = get_kweight_from_info(path)
 
-    # Indices with non-zero weight 
-    # idx = kweight.nonzero()[0]
-    # indices wiht zero weight i.e. the custom ones
     idx0 = np.nonzero(kweight == 0)[0]
 
     return idx0.astype(np.int)+1
@@ -172,12 +160,8 @@ def import_eigenvalues_file(fname):
     
     f = open(fname)
     lstart, line = search_string_in_file("#k =", f, rewind = False)
-    # print line.strip(' \n)').split()[6:9]
 
     nbands, line = search_string_in_file("#k =", f)
-    # print line.strip(' \n)').split()[2]
-    # print line.strip(' \n)').split()[6:9]
-    # print nbands
 
     # Figure out spin polarization
     for il, line in enumerate(f):
@@ -197,16 +181,12 @@ def import_eigenvalues_file(fname):
 
     
     lstart, line = search_string_in_file("#k =", f, rewind = False)
-    # k = line.strip(' \n)').split()[6:9]
     k = line.strip(' \n)').split("=")[2].split()[1:4]
     for i,kk in enumerate(k):
         k[i] = np.float(kk.strip(','))
     kmesh  = np.array(k, dtype=np.float)
     ik = np.int(line.strip(' \n)').split('=')[1].split()[0].strip(','))
     kidx = np.array([ik], dtype = np.int)
-    # kmesh = np.vstack((kmesh, k))
-
-    # print len(sidx)
     
     E  = np.array([], dtype=np.float)
 
@@ -223,11 +203,7 @@ def import_eigenvalues_file(fname):
                 
         if ist > 0:
             ist -= 1
-            
-            # print len(line.split())
-            # print line.split()
-        
-            # E = np.append(E, np.array(line.split())[idx])
+
             E = np.append(E, np.float(line.split()[2]))
             if len(sidx) > 0 and il > 0 :
                     spin = np.vstack((spin, line.split()[sidx[0]:sidx[1]] ))
@@ -237,66 +213,42 @@ def import_eigenvalues_file(fname):
                 kmesh = np.vstack((kmesh, k))
                 kidx = np.append(kidx, ik)
         else:     
-            # k = line.strip(' \n)').split()[6:9]
             k = line.strip(' \n)').split("=")[2].split()[1:4]
             for i,kk in enumerate(k):
                 k[i] = np.float(kk.strip(','))
             ik = np.int(line.strip(' \n)').split('=')[1].split()[0].strip(','))
-            # print k
-                
-            # kmesh = np.append(kmesh, k)
-            # kmesh = np.vstack((kmesh, k))
             ist = nbands 
 
-    # print kidx
-    # print E.shape
-    # print kmesh.shape
-    # print kmesh
-    # print spin
 
     f.close()
     
     # find_custom_kpoint_indices(get_prj_root_from_file(fname))
     idx0  = find_custom_kpoint_indices(get_prj_root_from_file(fname), kmesh.shape[0])
     if len(idx0)>0:
-        # print idx0
         # generate a mask indicating the indices of kidx that are contained in idx0 
         mask = np.in1d(kidx, idx0)
-        # print mask[np.where(kidx == 100)]
         E0 = E[mask]
         kmesh0 = kmesh[mask,:]
         if len(sidx):
             spin0 = spin[mask,:]
-        # print  kmesh0.shape, E0.shape
         mask = np.logical_not(mask) 
-        # print mask
         E  = E[mask]
         kmesh = kmesh[mask,:]
-        # print  kmesh.shape, E.shape
         if len(sidx):
             spin = spin[mask,:]
 
             
 
     
-    (kx,ky,kz,dim) = refine_dims_and_ks(kmesh[:,0],kmesh[:,1],kmesh[:,2], dim = 3)
-    # print E.shape[:], kx.shape[0],ky.shape[0],kz.shape[0]
-    # E = np.reshape(E,(kx.shape[0],ky.shape[0],kz.shape[0],nbands))
-    
+    (kx,ky,kz,dim) = refine_dims_and_ks(kmesh[:,0],kmesh[:,1],kmesh[:,2], dim = 3)    
     E = get_Eijm_from_bands (kx,ky,kz, kmesh, nbands, E, dim, spin)
     
     
     if len(idx0)>0:
-        # (kx0,ky0,kz0,dim0) = refine_dims_and_ks(kmesh0[:,0],kmesh0[:,1],kmesh0[:,2], dim = 3)
-        # E0 = get_Eijm_from_bands (kx0,ky0,kz0, kmesh0, nbands, E0, dim0, spin0)
-        #
-        # return (E, [kx, ky, kz], dim, E0, [kx0, ky0, kz0])
         for idim in range(3):
             E0 = np.vstack((E0,spin0[:,idim]))
         E0 = np.transpose(E0)
-        # print E0.shape
-        # print kmesh0.shape
-        # print E0
+
         return (E, [kx, ky, kz], dim, E0, kmesh0, nbands)
 
     return (E, [kx, ky, kz], dim)
@@ -388,52 +340,7 @@ def import_bands_file(fname, reduced = False):
         if ((bands[0,kcol0:kcol1]==bands[l,kcol0:kcol1]).all()): 
             nbands += 1
             
-    # # get unique k-point elements along the axes
-    # kx = np.unique(bands[:, kcol0 + 0])
-    # if dim > 1:
-    #     ky = np.unique(bands[:, kcol0 + 1])
-    #     if dim > 2:
-    #         kz = np.unique(bands[:, kcol0 + 2])
-    #     else:
-    #         kz = np.array([0.0],dtype= np.float)
-    # else:
-    #     ky = np.array([0.0],dtype= np.float)
-    #     kz = np.array([0.0],dtype= np.float)
-    #
-    # if (kz.shape[0] == 1): dim = 2 # we are effectively 2D
-    # if (ky.shape[0] == 1 and kz.shape[0] == 1): dim = 1 # we are effectively 1D
-    #
-    # print "Detected a %d-dimensional k-space with %d bands "%(dim, nbands)
-
     (kx,ky,kz,dim) = refine_dims_and_ks(bands[:, kcol0 + 0], bands[:, kcol0 + 1],bands[:, kcol0 + 2], dim)
-
-
-
-    # E  =  np.zeros((kx.shape[0],ky.shape[0],kz.shape[0],nbands))
-    # nnE = np.zeros((kx.shape[0],ky.shape[0],kz.shape[0],nbands),dtype= int)
-    # nnE[:,:,:] = nbands-1
-    #
-    # for l in range(bands.shape[0]):
-    #     k=bands[l,kcol0:kcol1]
-    #     i = np.where(kx == k[0])
-    #     if dim > 1:
-    #         j = np.where(ky == k[1])
-    #         if dim > 2:
-    #             m = np.where(kz == k[2])
-    #         else:
-    #             m = 0
-    #     else:
-    #         j = 0
-    #         m = 0
-    #     E[i,j,m, nnE[i,j,m]] = bands[l,ecol]
-    #     nnE[i,j,m] -= 1
-    #
-    #
-    #
-    # for i in range(kx.shape[0]):
-    #     for j in range(ky.shape[0]):
-    #         for m in range(kz.shape[0]):
-    #             E[i,j,m,:].sort()
     
     E = get_Eijm_from_bands (kx,ky,kz, bands[:,kcol0:kcol1], nbands, bands[:,ecol], dim)
     
@@ -747,7 +654,6 @@ the minimum spacing of the input data.
             nbands = imported[5]
             
             
-            print kmesh0.shape[0]/nbands
             nk_ = np.array([int(kmesh0.shape[0]/nbands), 0, 0])
             kk = np.zeros([nk_[0],3])
             E_ = np.zeros([nk_[0],1, nbands, E0.shape[1]])
@@ -762,41 +668,7 @@ the minimum spacing of the input data.
                 if i > 0:                    
                     dk = np.sqrt(np.sum((kmesh0[ll(i,j),:]-kmesh0[ll(i-1,j),:])**2))
                     kk[i] = kk[i-1] + dk
-                    print dk, ll(i,j), kmesh0[l,:]-kmesh0[l-1,:]
 
-
-            # print len(kmesh0[0]),len(kmesh0[1])
-            # # print E.shape
-            # # print E_.shape
-            # # print kk.shape
-            # # print kmesh0[0].shape[0], kmesh0[1].shape[0], kmesh0[2].shape[0]
-            # print E0.shape
-            # # print E_[0,0,0,0]
-            # # print E0[0,0,0,0,0]
-            #
-            # nk_ = np.array([len(kmesh0[0])*len(kmesh0[1])*len(kmesh0[2]), 0, 0])
-            # kk = np.zeros([nk_[0],3])
-            # E_ = np.zeros([nk_[0],1, E0.shape[3], E0.shape[4]])
-            #
-            #
-            # il = 0
-            # for i in range(len(kmesh0[0])):
-            #     for j in range(len(kmesh0[1])):
-            #         for m in range(len(kmesh0[2])):
-            #
-            #             k2 = np.array([kmesh0[0][i],kmesh0[1][j],kmesh0[2][m] ])
-            #
-            #             if il > 0 :
-            #                 # print kmesh0[0]
-            #                 # k1 = np.array(kmesh0[il][:], dtype=np.float)
-            #                 # k2 = np.array(kmesh0[il-1,:], dtype=np.float)
-            #                 dk = np.sqrt(np.sum((k2[:]-k1[:])**2))
-            #                 kk[il] = kk[il-1] + dk
-            #
-            #             E_[il,0,:,:] = E0[i,j,m,:,:]
-            #
-            #             k1 = k2
-            #             il += 1
             
             
             print "Detected a zero-weight path (%d points) in k-space with %d bands"%(kk.shape[0], nbands )
