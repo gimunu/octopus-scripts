@@ -445,6 +445,7 @@ def generate_kpath(pts, nk = None, spacing = None):
 
 
     kpath = []
+    upath = []
     for i in range (pts.shape[0]-1):
         p1 = pts[i,:]
         p2 = pts[i+1,:]
@@ -461,13 +462,14 @@ def generate_kpath(pts, nk = None, spacing = None):
         kk = np.zeros([u.shape[0],3])
         for iu in range(u.shape[0]):
             kk[iu,:] = np.array(line(v, p1 ,u[iu])[:])
-        kpath.append(kk)    
+        kpath.append(kk)
+        upath.append(u)    
             
     
-    return kpath
+    return kpath, upath
     
 
-def slice_on_line(E, kmesh, dim, nk, p1, p2, len0, spacing = None):
+def slice_on_line(E, kmesh, dim, nk, p1, p2, len0, spacing = None, kkin = None, uin = None):
     # We assume in the following that the kspace is 2D
         
     nbands = E.shape[3]
@@ -493,6 +495,8 @@ def slice_on_line(E, kmesh, dim, nk, p1, p2, len0, spacing = None):
     kk = np.zeros([u.shape[0],dim])
     for iu in range(u.shape[0]):
         kk[iu,:] = np.array(line(v, p1 ,u[iu])[0:dim])
+
+    
 
     # Check that the requested points are within the bounds of the input grid
     if (not points_in_bounds(kk,grid_bounds(kmesh,dim))):
@@ -594,7 +598,8 @@ Note: positional argument 'file' is ignored with this option."""
     
 
     # parser.add_argument('file', nargs='+')
-    parser.add_argument('file', nargs='?')
+    # parser.add_argument('file', nargs='?')
+    parser.add_argument('file', nargs='*')
     
 
     args = parser.parse_args()
@@ -617,7 +622,7 @@ Note: positional argument 'file' is ignored with this option."""
             for j in range(len(coords)):
                pts[i,j] = eval(coords[j])  
                
-        kpath = generate_kpath(pts, nk = args.npoints, spacing = args.spacing)       
+        kpath, upath = generate_kpath(pts, nk = args.npoints, spacing = args.spacing)       
         
         # print pts.shape[:]
         # dir = np.array(args.cut.split(','),dtype=float)    
@@ -640,14 +645,14 @@ Note: positional argument 'file' is ignored with this option."""
         exit(0)    
     
     
-    # loop over all the input files
-    if args.file is None:
+    # check if there are input files 
+    if args.file is None or len(args.file) == 0:
         parser.print_usage()
         print "%s: error: too few arguments."%(os.path.basename(sys.argv[0]))
-        print "You must specify a file if not using '--outpoints'."
-        
+        print "You must specify a file if not using '--outpoints'."        
         exit(1)
     
+    # loop over all the input files
     for file in args.file: 
 
         if have_kpoint_symmetries(file):
@@ -701,7 +706,7 @@ Note: positional argument 'file' is ignored with this option."""
                  p2 = pts[i+1,:]                      
                  print "Segment: %s --> %s"%(p1[0:dim],p2[0:dim])
                  header = "%s#\n# Slice on a line segment connecting %s and %s \n#\n"%(header,p1[0:dim],p2[0:dim])
-                 (E_,kx_,lenght) = slice_on_line(E, kmesh, dim, nk, p1, p2, lenght, spacing = args.spacing)
+                 (E_,kx_,lenght) = slice_on_line(E, kmesh, dim, nk, p1, p2, lenght, spacing = args.spacing, kkin = kpath[i][1], uin = upath[i][1])
                  nk_ = np.array((kx_.shape[0],0,0))
                  kk = np.zeros([max(nk_[:]),3])
                  kk[0:nk_[0],0] = kx_[0:nk_[0]]
