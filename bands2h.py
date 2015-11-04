@@ -22,7 +22,7 @@ from __future__ import division
 import argparse
 import sys
 
-try:
+try: 
     import numpy as np
 except ImportError:
     print "numpy is not installed"
@@ -280,7 +280,6 @@ def get_Eijm_from_bands (kx,ky,kz,kmesh, nbands, bands, dim, other = None ):
     else:
         assert(other.shape[0] == bands.shape[0])
         nother = other.shape[1]
-         
     
     E  =  np.zeros((kx.shape[0],ky.shape[0],kz.shape[0],nbands, nother+1))
     nnE = np.zeros((kx.shape[0],ky.shape[0],kz.shape[0],nbands),dtype= int)
@@ -300,9 +299,8 @@ def get_Eijm_from_bands (kx,ky,kz,kmesh, nbands, bands, dim, other = None ):
             m = 0 
         E[i,j,m, nnE[i,j,m], 0] = bands[l]
         for n in range(nother):
-            # print n
+            # add other (i.e. spin) columns 
             E[i,j,m, nnE[i,j,m], n+1] = other[l,n]
-        # print E[i,j,m, nnE[i,j,m],:]
         nnE[i,j,m] -= 1
     
 
@@ -310,10 +308,9 @@ def get_Eijm_from_bands (kx,ky,kz,kmesh, nbands, bands, dim, other = None ):
     for i in range(kx.shape[0]):
         for j in range(ky.shape[0]):
             for m in range(kz.shape[0]):
-                # print E[i,j,m, 0 ,:]
-                # E[i,j,m,:].sort()
+                # we have to sort all the other columns contaitning the spin 
+                # according only to energy ordering
                 E[i,j,m,:,:] = E[i,j,m, np.argsort(E[i,j,m,:,0])]
-                # print E[i,j,m, 0 ,:]
 
     return E
           
@@ -429,6 +426,47 @@ def points_in_bounds(pnts, bounds):
 
     return True
 
+
+def generate_kpath(pts, nk = None, spacing = None):
+    nk = 100 if nk is None else nk
+
+    length = np.zeros(pts.shape[0]-1)
+    nki = np.zeros(pts.shape[0]-1)
+    
+
+    for i in range (pts.shape[0]-1):
+        p1 = pts[i,:]
+        p2 = pts[i+1,:]
+                
+        v = (p2-p1)
+        length[i] = (np.sqrt(np.dot(v,v)))
+
+    du = length.sum()/nk  if spacing is None else spacing
+
+
+    kpath = []
+    for i in range (pts.shape[0]-1):
+        p1 = pts[i,:]
+        p2 = pts[i+1,:]
+        
+        v = (p2-p1)
+        length = (np.sqrt(np.dot(v,v)))
+
+        # if spacing:
+        #     du = spacing
+        u = np.linspace(0, 1, num = length/du)
+        # print u
+    
+        # Generate the grid-points on the line 
+        kk = np.zeros([u.shape[0],3])
+        for iu in range(u.shape[0]):
+            kk[iu,:] = np.array(line(v, p1 ,u[iu])[:])
+        kpath.append(kk)    
+            
+    
+    return kpath
+    
+
 def slice_on_line(E, kmesh, dim, nk, p1, p2, len0, spacing = None):
     # We assume in the following that the kspace is 2D
         
@@ -477,9 +515,7 @@ def slice_on_line(E, kmesh, dim, nk, p1, p2, len0, spacing = None):
     
     len1 = len0 + length
     u = u * length + len0
-    # print len0, len1, du
-    # print u
-    
+
     return (Eout, u, len1)      
         
 
@@ -536,23 +572,81 @@ option:
 
     parser.add_argument('--spacing', type=float, metavar='float', default= None, 
     help=
-"""Define the output grid spacing. The default value is 
+"""Define the grid spacing on the cut line. The default value is 
 the minimum spacing of the input data.
 """    
     )
+
+    parser.add_argument('--npoints', type=int, metavar='int', default= None, 
+    help="Number of points on the cut line"    
+    )
+
     
     parser.add_argument('--absolute', action="store_true", default=False, 
     help="Use absolute coordinates in reciprocal space.")
     
+    parser.add_argument('--outpoints', action="store_true", default=False, 
+    help=
+"""Prints the cut line as a zero-weight k-point path suitable 
+for octopus input file. 
+Note: positional argument 'file' is ignored with this option."""    
+    )
     
 
-    parser.add_argument('file', nargs='+')
+    # parser.add_argument('file', nargs='+')
+    parser.add_argument('file', nargs='?')
     
 
     args = parser.parse_args()
     
-
     
+    # parse the cut nodal points
+    if args.cut is not None:
+        try:
+            # read from file
+            f = open(args.cut)
+            path_string = f.readline()
+            f.close()
+        except:
+            # read from command line  
+            path_string = args.cut  
+        tokens = np.array(path_string.split(';'))
+        pts = np.zeros((tokens.shape[0],3))
+        for i in range(tokens.shape[0]):
+            coords  = tokens[i].split(',')
+            for j in range(len(coords)):
+               pts[i,j] = eval(coords[j])  
+               
+        kpath = generate_kpath(pts, nk = args.npoints, spacing = args.spacing)       
+        
+        # print pts.shape[:]
+        # dir = np.array(args.cut.split(','),dtype=float)    
+    
+    # Write the points along the path
+    if args.outpoints:
+        if args.cut is None:
+            raise Exception("You have to specify a cut path.")
+        
+        # print kpath
+        for kk in enumerate(kpath):
+            # print kk[1]
+            # for i in range(kk[1].shape[0]):
+            #     print ("%2.6f | %2.6f | %2.6f | %2.6f "%(0.0, kk[i,0], kk[i,1], kk[i,2]))
+            for i in range(kk[1].shape[0]):
+            # for k in enumerate(kk[1]):
+                k =  kk[1][i]
+                print ("%2.6f | %2.6f | %2.6f | %2.6f "%(0.0, k[0], k[1], k[2]))
+        
+        exit(0)    
+    
+    
+    # loop over all the input files
+    if args.file is None:
+        parser.print_usage()
+        print "%s: error: too few arguments."%(os.path.basename(sys.argv[0]))
+        print "You must specify a file if not using '--outpoints'."
+        
+        exit(1)
     
     for file in args.file: 
 
@@ -594,25 +688,6 @@ the minimum spacing of the input data.
         nk = np.zeros(3)
         nk = [kmesh[0].shape[0],kmesh[1].shape[0],kmesh[2].shape[0]]
 
-        # parse the cut nodal points
-        if args.cut is not None:
-            try:
-                # read from file
-                f = open(args.cut)
-                path_string = f.readline()
-                f.close()
-            except:
-                # read from command line  
-                path_string = args.cut  
-            tokens = np.array(path_string.split(';'))
-            pts = np.zeros((tokens.shape[0],3))
-            for i in range(tokens.shape[0]):
-                coords  = tokens[i].split(',')
-                for j in range(len(coords)):
-                   pts[i,j] = eval(coords[j])  
-            
-            # print pts.shape[:]
-            # dir = np.array(args.cut.split(','),dtype=float)
         
                 
             
