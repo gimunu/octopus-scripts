@@ -73,8 +73,13 @@ def have_kpoint_symmetries(file):
     except:
         f = None
     if search_string_in_file("symmetry-reduced k-points",f):
-        f.close()
-        return True
+        il, line = search_string_in_file("symmetry-reduced k-points",f)
+        nsymm =  int(line.split()[-1])
+        il, line = search_string_in_file("Total number of k-point",f)
+        nk =  int(line.split()[-1])
+        if nk != nsymm :
+            f.close()
+            return True
 
     try: 
         filename = path + "/inp"
@@ -213,6 +218,7 @@ def import_eigenvalues_file(fname):
                 kmesh = np.vstack((kmesh, k))
                 kidx = np.append(kidx, ik)
         else:     
+            print line
             k = line.strip(' \n)').split("=")[2].split()[1:4]
             for i,kk in enumerate(k):
                 k[i] = np.float(kk.strip(','))
@@ -427,8 +433,8 @@ def points_in_bounds(pnts, bounds):
     return True
 
 
-def generate_kpath(pts, nk = None, spacing = None):
-    nk = 100 if nk is None else nk
+def generate_kpath(pts, nk, spacing = None):
+    # nk = 100 if nk is None else nk
 
     length = np.zeros(pts.shape[0]-1)
     nki = np.zeros(pts.shape[0]-1)
@@ -453,10 +459,7 @@ def generate_kpath(pts, nk = None, spacing = None):
         v = (p2-p1)
         length = (np.sqrt(np.dot(v,v)))
 
-        # if spacing:
-        #     du = spacing
         u = np.linspace(0, 1, num = length/du)
-        # print u
     
         # Generate the grid-points on the line 
         kk = np.zeros([u.shape[0],3])
@@ -475,27 +478,37 @@ def slice_on_line(E, kmesh, dim, nk, p1, p2, len0, spacing = None, kkin = None, 
     nbands = E.shape[3]
 
     #Same spacing as the original grid unless otherwise specified
-    dk = np.zeros(dim-1)
-    for idim in range(dim-1):
-        dk[idim] = np.abs(kmesh[idim][1]-kmesh[idim][0])
-        
+    # dk = np.zeros(dim-1)
+    # for idim in range(dim-1):
+    #     dk[idim] = np.abs(kmesh[idim][1]-kmesh[idim][0])
+    #
+    #
+    #
+    # v = (p2-p1)
+    # length = (np.sqrt(np.dot(v,v)))
+    # du = min(dk[:])
+    # if spacing:
+    #     du = spacing
+    # u = np.linspace(0, 1, num = length/du)
+    # # print u
+    #
+    # Eout = np.zeros([u.shape[0],1, nbands, E.shape[4]])
+    #
+    # # Generate the grid-points on the line
+    # kk = np.zeros([u.shape[0],dim])
+    # for iu in range(u.shape[0]):
+    #     kk[iu,:] = np.array(line(v, p1 ,u[iu])[0:dim])
+
+    ########
     
-    
-    v = (p2-p1)
-    length = (np.sqrt(np.dot(v,v)))
-    du = min(dk[:])
-    if spacing:
-        du = spacing
-    u = np.linspace(0, 1, num = length/du)
-    # print u
-    
+
+    u = uin 
     Eout = np.zeros([u.shape[0],1, nbands, E.shape[4]])
-
-    # Generate the grid-points on the line 
     kk = np.zeros([u.shape[0],dim])
-    for iu in range(u.shape[0]):
-        kk[iu,:] = np.array(line(v, p1 ,u[iu])[0:dim])
-
+    kk[:,0:dim] = kkin[:,0:dim]
+    
+    v = kk[-1,:]-kk[0,:]
+    length = (np.sqrt(np.dot(v,v)))
     
 
     # Check that the requested points are within the bounds of the input grid
@@ -581,8 +594,8 @@ the minimum spacing of the input data.
 """    
     )
 
-    parser.add_argument('--npoints', type=int, metavar='int', default= None, 
-    help="Number of points on the cut line"    
+    parser.add_argument('--npoints', type=int, metavar='int', default= 100, 
+    help="Number of points on the cut line. By default npoints = 100."    
     )
 
     
@@ -664,17 +677,19 @@ Note: positional argument 'file' is ignored with this option."""
 """
             )
 
-        if file.lower() == "bands-gp.dat":
+        if "bands-gp.dat" in file.lower():
             imported = import_bands_file(file,not args.absolute)
-        elif file.lower() == "eigenvalues":     
+        elif "eigenvalues" in file.lower() :     
             imported = import_eigenvalues_file(file)            
-        elif file.lower() == "info":     
+        elif "info" in file.lower():     
             imported = import_eigenvalues_file(file)            
         else:
             try: 
                 imported = import_bands_file(file,not args.absolute)
             except:
-                print('Error: Unrecognized input file %s.\nThe supported files are \'bands-gp.dat\' and \'eigenvalues\'.'%(file))
+                print("""
+Error: Unrecognized input file %s. The supported files 
+are \'bands-gp.dat\', \'info\' and \'eigenvalues\'."""%(file))
                 sys.exit(1)
 
         E = imported[0]  
@@ -706,7 +721,7 @@ Note: positional argument 'file' is ignored with this option."""
                  p2 = pts[i+1,:]                      
                  print "Segment: %s --> %s"%(p1[0:dim],p2[0:dim])
                  header = "%s#\n# Slice on a line segment connecting %s and %s \n#\n"%(header,p1[0:dim],p2[0:dim])
-                 (E_,kx_,lenght) = slice_on_line(E, kmesh, dim, nk, p1, p2, lenght, spacing = args.spacing, kkin = kpath[i][1], uin = upath[i][1])
+                 (E_,kx_,lenght) = slice_on_line(E, kmesh, dim, nk, p1, p2, lenght, spacing = args.spacing, kkin = kpath[i], uin = upath[i])
                  nk_ = np.array((kx_.shape[0],0,0))
                  kk = np.zeros([max(nk_[:]),3])
                  kk[0:nk_[0],0] = kx_[0:nk_[0]]
