@@ -125,16 +125,27 @@ def get_kweight_from_inp(path):
         f = open(fname)
     except:
         return None 
+    try:
+        istart, line= search_string_in_file("KPointsReduced", f, commentchar = '#',rewind = False)
+    except:
+        f.seek(0, 0)    
+        try: 
+            istart, line= search_string_in_file("KPoints", f, commentchar = '#',rewind = False)
+        except: 
+            return None
+        
     
-    istart, line= search_string_in_file("KPointsReduced", f, commentchar = '#',rewind = False)
     iend, line= search_string_in_file("%", f)
 
     iend = istart + iend + 1
 
     kweight = np.array([], dtype=np.float)
-    for i, line in enumerate(f):
-     if i > istart and i < iend :
-         kweight = np.append(kweight, np.float(line.strip(' \n').split('|')[0]))
+    for i, line in enumerate(f):  
+        #skip comment  
+        if line.strip().startswith("#"):
+            continue
+        if i > istart and i < iend :
+            kweight = np.append(kweight, np.float(line.strip(' \n').split('|')[0]))
     f.close()
     
     kweight = kweight if kweight.shape[0] > 0 else None
@@ -142,19 +153,24 @@ def get_kweight_from_inp(path):
      
 
 
-def find_custom_kpoint_indices(path, nk):
+def find_custom_kpoint_indices(fname, nk):
     kweight = None
+    path = get_prj_root_from_file(fname)
     
-    kweight = get_kweight_from_inp(path)
-    if kweight is not None:
-        # if np.count_nonzero(kweight) == 0 :
-        #     # it means that the userdefined kpoints only contain the zero-weight path
-        #     n0 = kweight.shape[0]
-        #     kweight = np.zeros(nk)
-        #     kweight[0:nk-n0] = 1
-        pass
-    else:
+    if 'info' in fname:
         kweight = get_kweight_from_info(path)
+    else:     
+        kweight = get_kweight_from_inp(path)
+        
+    # if kweight is not None:
+    #     # if np.count_nonzero(kweight) == 0 :
+    #     #     # it means that the userdefined kpoints only contain the zero-weight path
+    #     #     n0 = kweight.shape[0]
+    #     #     kweight = np.zeros(nk)
+    #     #     kweight[0:nk-n0] = 1
+    #     pass
+    # else:
+        # kweight = get_kweight_from_info(path)
 
     idx0 = np.nonzero(kweight == 0)[0]
 
@@ -198,7 +214,7 @@ def import_eigenvalues_file(fname):
     ist = nbands
     skip = True
     for il, line in enumerate(f):
-        if line == "\n":
+        if line == "\n" or "Fermi" in line:
             break
         if il == 0:
             if len(sidx) > 0 :
@@ -218,7 +234,6 @@ def import_eigenvalues_file(fname):
                 kmesh = np.vstack((kmesh, k))
                 kidx = np.append(kidx, ik)
         else:     
-            print line
             k = line.strip(' \n)').split("=")[2].split()[1:4]
             for i,kk in enumerate(k):
                 k[i] = np.float(kk.strip(','))
@@ -229,7 +244,7 @@ def import_eigenvalues_file(fname):
     f.close()
     
     # find_custom_kpoint_indices(get_prj_root_from_file(fname))
-    idx0  = find_custom_kpoint_indices(get_prj_root_from_file(fname), kmesh.shape[0])
+    idx0  = find_custom_kpoint_indices(fname, kmesh.shape[0])
     if len(idx0)>0:
         # generate a mask indicating the indices of kidx that are contained in idx0 
         mask = np.in1d(kidx, idx0)
@@ -237,6 +252,8 @@ def import_eigenvalues_file(fname):
         kmesh0 = kmesh[mask,:]
         if len(sidx):
             spin0 = spin[mask,:]
+        else:
+            spin0 = None    
         mask = np.logical_not(mask) 
         E  = E[mask]
         kmesh = kmesh[mask,:]
@@ -251,10 +268,15 @@ def import_eigenvalues_file(fname):
     
     
     if len(idx0)>0:
-        for idim in range(3):
-            E0 = np.vstack((E0,spin0[:,idim]))
-        E0 = np.transpose(E0)
-
+        if spin0 is not None :
+            for idim in range(3):
+                E0 = np.vstack((E0,spin0[:,idim]))
+            E0 = np.transpose(E0)
+        else:
+            E0tmp = np.zeros([E0.shape[0],1])
+            E0tmp[:,0] =E0[:]
+            E0 = E0tmp 
+            
         return (E, [kx, ky, kz], dim, E0, kmesh0, nbands)
 
     return (E, [kx, ky, kz], dim)
@@ -747,8 +769,7 @@ are \'bands-gp.dat\', \'info\' and \'eigenvalues\'."""%(file))
             E0     = imported[3]
             kmesh0 = imported[4]
             nbands = imported[5]
-            
-            
+                        
             nk_ = np.array([int(kmesh0.shape[0]/nbands), 0, 0])
             kk = np.zeros([nk_[0],3])
             E_ = np.zeros([nk_[0],1, nbands, E0.shape[1]])
