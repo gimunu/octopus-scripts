@@ -576,11 +576,15 @@ To process input file(s):
 \n\n
     """
 
-    parser = argparse.ArgumentParser(version='%s version %s' %(sys.argv[0],VERSION),
-                                     description=desc,
+    # parser = argparse.ArgumentParser(version='%s version %s' %(sys.argv[0],VERSION),
+    #                                  description=desc,
+    #                                  epilog=epilog,
+    #                                  formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(description=desc,
                                      epilog=epilog,
                                      formatter_class=argparse.RawTextHelpFormatter)
 
+    # parser.add_argument(action='version', version='%s version %s' %(sys.argv[0],VERSION))
 
     parser.add_argument('-c', '--cut', action='store', metavar='p1x,p1y,p1z;p2x,p2y,p2z[;p3 ...]', default= None,
     help=
