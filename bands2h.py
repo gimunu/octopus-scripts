@@ -282,7 +282,7 @@ def import_eigenvalues_file(fname):
     return (E, [kx, ky, kz], dim)
 
   
-def refine_dims_and_ks(kx,ky,kz, dim):
+def refine_dims_and_ks(dim, kx,ky=None,kz=None):
 
     # get unique k-point elements along the axes
     kx = np.unique(kx)
@@ -364,8 +364,14 @@ def import_bands_file(fname, reduced = False):
     for l in range(bands.shape[0]):
         if ((bands[0,kcol0:kcol1]==bands[l,kcol0:kcol1]).all()): 
             nbands += 1
-            
-    (kx,ky,kz,dim) = refine_dims_and_ks(bands[:, kcol0 + 0], bands[:, kcol0 + 1],bands[:, kcol0 + 2], dim)
+                      
+    if dim == 1:
+        (kx,ky,kz,dim) = refine_dims_and_ks(dim, bands[:, kcol0 + 0])
+    elif dim == 2:    
+        (kx,ky,kz,dim) = refine_dims_and_ks(dim, bands[:, kcol0 + 0], ky=bands[:, kcol0 + 1])
+    elif dim == 3:   
+        (kx,ky,kz,dim) = refine_dims_and_ks(dim, bands[:, kcol0 + 0], ky=bands[:, kcol0 + 1],kz=bands[:, kcol0 + 2])        
+                
     
     E = get_Eijm_from_bands (kx,ky,kz, bands[:,kcol0:kcol1], nbands, bands[:,ecol], dim)
     
