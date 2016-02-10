@@ -126,11 +126,11 @@ def get_kweight_from_inp(path):
     except:
         return None 
     try:
-        istart, line= search_string_in_file("KPointsReduced", f, commentchar = '#',rewind = False)
+        istart, line= search_string_in_file("%KPointsReduced", f, commentchar = '#',rewind = False)
     except:
         f.seek(0, 0)    
         try: 
-            istart, line= search_string_in_file("KPoints", f, commentchar = '#',rewind = False)
+            istart, line= search_string_in_file("%KPoints", f, commentchar = '#',rewind = False)
         except: 
             return None
         
