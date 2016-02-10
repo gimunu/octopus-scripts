@@ -203,6 +203,7 @@ def import_eigenvalues_file(fname):
     
     lstart, line = search_string_in_file("#k =", f, rewind = False)
     k = line.strip(' \n)').split("=")[2].split()[1:4]
+    dim = len(k)
     for i,kk in enumerate(k):
         k[i] = np.float(kk.strip(','))
     kmesh  = np.array(k, dtype=np.float)
@@ -262,8 +263,13 @@ def import_eigenvalues_file(fname):
 
             
 
+    if dim == 1:
+        (kx,ky,kz,dim) = refine_dims_and_ks(dim, kmesh[:,0])
+    elif dim == 2:
+        (kx,ky,kz,dim) = refine_dims_and_ks(dim, kmesh[:,0], ky=kmesh[:,1])
+    elif dim == 3:
+        (kx,ky,kz,dim) = refine_dims_and_ks(dim, kmesh[:,0], ky=kmesh[:,1],kz=kmesh[:,2])
     
-    (kx,ky,kz,dim) = refine_dims_and_ks(kmesh[:,0],kmesh[:,1],kmesh[:,2], dim = 3)    
     E = get_Eijm_from_bands (kx,ky,kz, kmesh, nbands, E, dim, spin)
     
     
@@ -282,7 +288,7 @@ def import_eigenvalues_file(fname):
     return (E, [kx, ky, kz], dim)
 
   
-def refine_dims_and_ks(dim, kx,ky=None,kz=None):
+def refine_dims_and_ks(dim, kx, ky=None, kz=None):
 
     # get unique k-point elements along the axes
     kx = np.unique(kx)
