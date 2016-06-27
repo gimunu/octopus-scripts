@@ -286,25 +286,32 @@ def import_eigenvalues_file(fname):
         return (E, [kx, ky, kz], dim, E0, kmesh0, nbands)
 
     return (E, [kx, ky, kz], dim)
-
   
-def refine_dims_and_ks(dim, kx, ky=None, kz=None):
 
+
+def unique_or_vec(vec, use_mesh_grid, nkpt):
+    if (use_mesh_grid):
+        return vec[0:nkpt]    
+    else:
+        return np.unique(vec)
+  
+def refine_dims_and_ks(dim, kx, ky=None, kz=None, use_mesh_grid = False, nkpt=None):
+    
     # get unique k-point elements along the axes
-    kx = np.unique(kx)
+    kx = unique_or_vec(kx, use_mesh_grid, nkpt) #np.unique(kx)
     if dim > 1:
-        ky = np.unique(ky)
+        ky = unique_or_vec(ky, use_mesh_grid, nkpt) #np.unique(ky)
         if dim > 2: 
-            kz = np.unique(kz)
+            kz = unique_or_vec(kz, use_mesh_grid, nkpt) #np.unique(kz)
         else:
             kz = np.array([0.0],dtype= np.float)            
     else:
         ky = np.array([0.0],dtype= np.float)
         kz = np.array([0.0],dtype= np.float)
-        
-    if (kz.shape[0] == 1): dim = 2 # we are effectively 2D 
+                    
+    if (kz.shape[0] == 1 or all(kzi == 0.0 for kzi in kz)): dim = 2 # we are effectively 2D
     if (ky.shape[0] == 1 and kz.shape[0] == 1): dim = 1 # we are effectively 1D 
-
+                
     return (kx,ky,kz, dim)
 
 def get_Eijm_from_bands (kx,ky,kz,kmesh, nbands, bands, dim, other = None ):
@@ -347,8 +354,66 @@ def get_Eijm_from_bands (kx,ky,kz,kmesh, nbands, bands, dim, other = None ):
                 E[i,j,m,:,:] = E[i,j,m, np.argsort(E[i,j,m,:,0])]
 
     return E
+   
+def get_Ei_from_bands (kx,ky,kz,kmesh, nbands, bands, dim, other = None ):
+
+    if other is None:
+        nother = 0
+    else:
+        assert(other.shape[0] == bands.shape[0])
+        nother = other.shape[1]
+    
+    E  =  np.zeros((kx.shape[0],nbands, nother+1))
+    nnE = np.zeros((kx.shape[0],nbands),dtype= int)
+    nnE[:] = nbands-1
+
+    if dim == 1: kkmat = np.array([kx])
+    if dim == 2: kkmat = np.array([kx,ky])
+    if dim == 3: kkmat = np.array([kx,ky,kz])
+
+    kkmat=np.transpose(kkmat)
+    
+    for l in range(bands.shape[0]):
+        kvec=kmesh[l,0:dim]
+        i = np.argwhere( np.all((kkmat - kvec)==0, axis=1))[0][0]
+        # print  i
+
+        E[i, nnE[i], 0] = bands[l]
+        for n in range(nother):
+            # add other (i.e. spin) columns 
+            E[i, nnE[i], n+1] = other[l,n]
+        nnE[i] -= 1
+    
+
+
+    for i in range(kx.shape[0]):
+        for j in range(ky.shape[0]):
+            for m in range(kz.shape[0]):
+                # we have to sort all the other columns contaitning the spin 
+                # according only to energy ordering
+                E[i,:,:] = E[i, np.argsort(E[i,:,0])]
+
+    return E
+    
+
+   
+def get_nkp_from_bands_file(fname):
+    f = open(fname)
+    if f is not None:
+        for il, line in enumerate(f):
+            if line[0] == "#":
+                continue
+            if line== '\n':
+                f.close()
+                return il-1
+        f.close()        
+        return None
+
+    return None
           
-def import_bands_file(fname, reduced = False):
+def import_bands_file(fname, abs_coords, use_mesh_grid = False):
+
+    use_mesh_grid = use_mesh_grid or abs_coords
 
     bands = np.loadtxt(fname)
 
@@ -356,32 +421,36 @@ def import_bands_file(fname, reduced = False):
     dim = int((bands.shape[1] - 1)/2)
     kcol0 = 0
     # kcol1 = dim
-    if reduced:
+    if not abs_coords:
         kcol0 = dim 
+        
     kcol1 = kcol0 + dim    
         
     ecol = bands.shape[1]-1
-        
-    
-    kk    = np.array(bands[:,kcol0:kcol1])
-    Etmp  = np.array(bands[:,ecol])
 
     nbands=0
     for l in range(bands.shape[0]):
-        if ((bands[0,kcol0:kcol1]==bands[l,kcol0:kcol1]).all()): 
+        if ((bands[0,kcol0:kcol1]==bands[l,kcol0:kcol1]).all()):
             nbands += 1
+    
+    nkpt = get_nkp_from_bands_file(fname)
+        
                       
     if dim == 1:
-        (kx,ky,kz,dim) = refine_dims_and_ks(dim, bands[:, kcol0 + 0])
+        (kx,ky,kz,dim) = refine_dims_and_ks(dim, bands[:, kcol0 + 0], use_mesh_grid=use_mesh_grid, nkpt=nkpt)
     elif dim == 2:    
-        (kx,ky,kz,dim) = refine_dims_and_ks(dim, bands[:, kcol0 + 0], ky=bands[:, kcol0 + 1])
+        (kx,ky,kz,dim) = refine_dims_and_ks(dim, bands[:, kcol0 + 0], ky=bands[:, kcol0 + 1], use_mesh_grid=use_mesh_grid, nkpt=nkpt)
     elif dim == 3:   
-        (kx,ky,kz,dim) = refine_dims_and_ks(dim, bands[:, kcol0 + 0], ky=bands[:, kcol0 + 1],kz=bands[:, kcol0 + 2])        
-                
+        (kx,ky,kz,dim) = refine_dims_and_ks(dim, bands[:, kcol0 + 0], ky=bands[:, kcol0 + 1],kz=bands[:, kcol0 + 2], use_mesh_grid=use_mesh_grid, nkpt=nkpt)  
+
     
-    E = get_Eijm_from_bands (kx,ky,kz, bands[:,kcol0:kcol1], nbands, bands[:,ecol], dim)
+    if use_mesh_grid:
+        E = get_Ei_from_bands (kx,ky,kz, bands[:,kcol0:kcol1], nbands, bands[:,ecol], dim)
+    else:
+        E = get_Eijm_from_bands (kx,ky,kz, bands[:,kcol0:kcol1], nbands, bands[:,ecol], dim)
     
     return (E, [kx, ky, kz], dim)
+        
 
 def write_gpl(fname, E, kk, nk, header = None, append = False):
         if append:
@@ -412,6 +481,50 @@ def write_gpl(fname, E, kk, nk, header = None, append = False):
             
         out.write("\n")             
         out.close()
+
+def write_gpl_meshgrid(fname, E, kk, header = None, append = False, kk_reduced = None):
+        if append:
+            out = open( fname+".gpl","a")
+        else:
+            out = open( fname+".gpl","w")
+                        
+        if header is not None:
+            out.write("%s"%header)
+
+        # print kk
+
+        if kk_reduced is not None:
+            idx= np.lexsort((kk_reduced[:,1],kk_reduced[:,0]))
+        else:
+            idx= np.lexsort((kk[:,1],kk[:,0]))
+
+        # print kk[idx,0:2]
+
+        vprev = np.zeros(2) 
+        v     = np.zeros(2) 
+        vprev_r = np.zeros(2) 
+        v_r     = np.zeros(2) 
+        for ik in range(E.shape[0]):
+            v = kk[idx[ik],0:2]
+            
+            if kk_reduced is not None:
+                v_r = kk_reduced[idx[ik],0:2]
+                if v_r[0] != vprev_r[0]: out.write("\n")
+                vprev_r = v_r
+            else:
+                if v[0] != vprev[0]: out.write("\n")
+                vprev = v
+                
+                
+            out.write("%e\t%e"%(v[0], v[1]))
+            for ie in range(E.shape[1]):
+                for io in range(E.shape[2]):
+                    out.write("\t%e"%(E[idx[ik],ie,io]))
+                    
+            out.write("\n")
+
+        out.close()
+
     
 
 def line(v, p, u):
@@ -574,7 +687,7 @@ def slice_on_line(E, kmesh, dim, nk, p1, p2, len0, spacing = None, kkin = None, 
 
 def main(args):
 
-    VERSION = '0.0(alpha)'
+    VERSION = '0.1'
     
     desc="""This utility converts the bands structure file generated by Octopus 
 into a human-readable and easy-to-plot format.  
@@ -714,9 +827,16 @@ Note: positional argument 'file' is ignored with this option."""
  be garbage.
 """
             )
+        
 
         if "bands-gp.dat" in file.lower():
-            imported = import_bands_file(file,not args.absolute)
+            if args.absolute:
+                imported = import_bands_file(file, abs_coords = args.absolute)
+                kmesh_abs = imported[1]            
+                imported = import_bands_file(file, abs_coords = False, use_mesh_grid = True)
+            else:
+                imported = import_bands_file(file, abs_coords = args.absolute)
+                
         elif "eigenvalues" in file.lower() :     
             imported = import_eigenvalues_file(file)            
         elif "info" in file.lower():     
@@ -731,17 +851,30 @@ are \'bands-gp.dat\', \'info\' and \'eigenvalues\'."""%(file))
                 sys.exit(1)
 
         E = imported[0]  
-        kmesh = imported[1]
-        dim = imported[2]   
+        kmesh = imported[1]            
+        dim = imported[2] 
+        meshdim = len(E.shape )-1
+        
+        
+        if not args.absolute:
+            print "Detected a %d-dimensional k-space with %d (%d x %d x %d) k-points and %d bands "%(dim,np.prod(E.shape[0:2]),E.shape[0],E.shape[1],E.shape[2],  E.shape[3])
+            header = "# This file contains %s bands"%(E.shape[3])
 
-        print "Detected a %d-dimensional k-space with %d (%d x %d x %d) k-points and %d bands "%(dim,np.prod(E.shape[0:2]),E.shape[0],E.shape[1],E.shape[2],  E.shape[3])
-        header = "# This file contains %s bands"%(E.shape[3])
-
-        if E.shape[4]>1:
-            print "with %d spin compoments"%(E.shape[4]-1)
-            header = "%s with %d spin compoments.\n"%(header,E.shape[4]-1)
+            if E.shape[4]>1:
+                print "with %d spin compoments"%(E.shape[4]-1)
+                header = "%s with %d spin compoments.\n"%(header,E.shape[4]-1)
+            else:
+                header = "%s.\n"%(header)
         else:
-            header = "%s.\n"%(header)
+            print "Detected a %d-dimensional k-space with %d k-points and %d bands "%(dim,E.shape[0],E.shape[1])
+            header = "# This file contains %s bands"%(E.shape[1])
+            if E.shape[2]>1:
+                print "with %d spin compoments"%(E.shape[2]-1)
+                header = "%s with %d spin compoments.\n"%(header,E.shape[2]-1)
+            else:
+                header = "%s.\n"%(header)
+            
+                 
             
         nk = np.zeros(3)
         nk = [kmesh[0].shape[0],kmesh[1].shape[0],kmesh[2].shape[0]]
@@ -770,12 +903,26 @@ are \'bands-gp.dat\', \'info\' and \'eigenvalues\'."""%(file))
                  header = ""
                  append = True
         elif dim <= 2:
-            E_ = E[:,:,0,:,:]        
-            kk = np.zeros([max(nk[:]),3])
-            kk[0:nk[0],0] = kmesh[0][0:nk[0]]
-            kk[0:nk[1],1] = kmesh[1][0:nk[1]]
+            if not args.absolute :
+                E_ = E[:,:,0,:,:]        
+                kk = np.zeros([max(nk[:]),3])
+                kk[0:nk[0],0] = kmesh[0][0:nk[0]]
+                kk[0:nk[1],1] = kmesh[1][0:nk[1]]
+                
+                write_gpl(file, E_, kk, nk, header)
+            else:
+                E_ = E[:,:,:]        
+                kk_red = np.zeros([kmesh[0].shape[0],3])
+                kk_red[0:nk[0],0] = kmesh[0][0:nk[0]]
+                kk_red[0:nk[1],1] = kmesh[1][0:nk[1]]
 
-            write_gpl(file, E_, kk, nk, header)
+                kk_abs = np.zeros([kmesh[0].shape[0],3])
+                kk_abs[0:nk[0],0] = kmesh_abs[0][0:nk[0]]
+                kk_abs[0:nk[1],1] = kmesh_abs[1][0:nk[1]]
+
+                
+                write_gpl_meshgrid(file, E_, kk_abs, header, kk_reduced = kk_red)
+
         
         
         if len(imported) > 3:
