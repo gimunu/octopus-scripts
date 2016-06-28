@@ -202,7 +202,7 @@ def find_custom_kpoint_indices(fname, nk):
 
     return idx0.astype(np.int)+1
     
-def import_eigenvalues_file(fname, abs_coords, use_mesh_grid = False, skip_E = False):
+def import_eigenvalues_file(fname, abs_coords, use_mesh_grid = False):
     
     use_mesh_grid = use_mesh_grid or abs_coords
     
@@ -318,10 +318,7 @@ def import_eigenvalues_file(fname, abs_coords, use_mesh_grid = False, skip_E = F
     if use_mesh_grid:
         # select from kmesh with nbands stride
         kx, ky, kz = kmesh[1::nbands,0], kmesh[1::nbands,1], kmesh[1::nbands,2]
-        if not skip_E:
-            E = get_Ei_from_bands (kx,ky,kz, kmesh, nbands, E, dim, spin)  
-        else:
-            E = np.zeros(1)
+        E = get_Ei_from_bands (kx,ky,kz, kmesh, nbands, E, dim, spin)  
     else:
         E = get_Eijm_from_bands (kx,ky,kz, kmesh, nbands, E, dim, spin)
     
@@ -438,10 +435,8 @@ def get_Ei_from_bands (kx,ky,kz,kmesh, nbands, bands, dim, other = None ):
 
 
     for i in range(kx.shape[0]):
-        # for j in range(ky.shape[0]):
-        #     for m in range(kz.shape[0]):
-                # we have to sort all the other columns contaitning the spin 
-                # according only to energy ordering
+        # we have to sort all the other columns containing the spin 
+        # according only to energy ordering
         E[i,:,:] = E[i, np.argsort(E[i,:,0])]
 
         update_progress(i/(kx.shape[0]-1))
@@ -737,7 +732,7 @@ def slice_on_line(E, kmesh, dim, nk, p1, p2, len0, spacing = None, kkin = None, 
     return (Eout, u, len1)      
         
 
-def import_file(file, abs_coords, use_mesh_grid = False, skip_E = False):
+def import_file(file, abs_coords, use_mesh_grid = False):
     
     if "bands-gp.dat" in file.lower():
         imported = import_bands_file(file, abs_coords=abs_coords, use_mesh_grid=use_mesh_grid)
@@ -745,7 +740,7 @@ def import_file(file, abs_coords, use_mesh_grid = False, skip_E = False):
     elif "eigenvalues" in file.lower() :     
         imported = import_eigenvalues_file(file, abs_coords=abs_coords, use_mesh_grid=use_mesh_grid)            
     elif "info" in file.lower():     
-        imported = import_eigenvalues_file(file, abs_coords=abs_coords, use_mesh_grid=use_mesh_grid, skip_E = skip_E)            
+        imported = import_eigenvalues_file(file, abs_coords=abs_coords, use_mesh_grid=use_mesh_grid)            
     else:
         try: 
             imported = import_bands_file(file,not args.absolute)
@@ -904,7 +899,7 @@ Note: positional argument 'file' is ignored with this option."""
 """
             )
         if args.absolute:
-            imported = import_file(file, abs_coords = args.absolute, skip_E = True)
+            imported = import_file(file, abs_coords = args.absolute)
             kmesh_abs = imported[1]            
             imported = import_file(file, abs_coords = False, use_mesh_grid = True)
         else:        
