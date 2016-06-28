@@ -176,8 +176,9 @@ def find_custom_kpoint_indices(fname, nk):
 
     return idx0.astype(np.int)+1
     
-def import_eigenvalues_file(fname):
+def import_eigenvalues_file(fname, abs_coords, use_mesh_grid = False):
     
+    use_mesh_grid = use_mesh_grid or abs_coords
     
     f = open(fname)
     lstart, line = search_string_in_file("#k =", f, rewind = False)
@@ -211,6 +212,7 @@ def import_eigenvalues_file(fname):
     kidx = np.array([ik], dtype = np.int)
     
     E  = np.array([], dtype=np.float)
+    nkpt = 1
 
     ist = nbands
     skip = True
@@ -235,14 +237,32 @@ def import_eigenvalues_file(fname):
                 kmesh = np.vstack((kmesh, k))
                 kidx = np.append(kidx, ik)
         else:     
+            nkpt += 1
             k = line.strip(' \n)').split("=")[2].split()[1:4]
             for i,kk in enumerate(k):
                 k[i] = np.float(kk.strip(','))
             ik = np.int(line.strip(' \n)').split('=')[1].split()[0].strip(','))
             ist = nbands 
 
+    if abs_coords:        
+        f.seek(0, 0)
+        lstart, line = search_string_in_file("Reciprocal-Lattice Vectors", f, rewind = False)
+        rlattice = np.zeros([3,3])
+    
+        for il, line in enumerate(f):
+            if il > 2:
+                break
+            rvec = line.strip('\n').split()
+            print rvec
+            for j,val in enumerate(rvec):
+                rlattice[il,j]=np.float(val)
+        # multiply each kpoint for the reciprocal lattice vectors
+        kmesh = np.dot(kmesh, rlattice)
+
 
     f.close()
+    
+    
     
     # find_custom_kpoint_indices(get_prj_root_from_file(fname))
     idx0  = find_custom_kpoint_indices(fname, kmesh.shape[0])
@@ -262,7 +282,6 @@ def import_eigenvalues_file(fname):
             spin = spin[mask,:]
 
             
-
     if dim == 1:
         (kx,ky,kz,dim) = refine_dims_and_ks(dim, kmesh[:,0])
     elif dim == 2:
@@ -270,7 +289,13 @@ def import_eigenvalues_file(fname):
     elif dim == 3:
         (kx,ky,kz,dim) = refine_dims_and_ks(dim, kmesh[:,0], ky=kmesh[:,1],kz=kmesh[:,2])
     
-    E = get_Eijm_from_bands (kx,ky,kz, kmesh, nbands, E, dim, spin)
+    
+    if use_mesh_grid:
+        # select from kmesh with nbands stride
+        kx, ky, kz = kmesh[1::nbands,0], kmesh[1::nbands,1], kmesh[1::nbands,2]
+        E = get_Ei_from_bands (kx,ky,kz, kmesh, nbands, E, dim, spin)
+    else:
+        E = get_Eijm_from_bands (kx,ky,kz, kmesh, nbands, E, dim, spin)
     
     
     if len(idx0)>0:
@@ -372,11 +397,9 @@ def get_Ei_from_bands (kx,ky,kz,kmesh, nbands, bands, dim, other = None ):
     if dim == 3: kkmat = np.array([kx,ky,kz])
 
     kkmat=np.transpose(kkmat)
-    
     for l in range(bands.shape[0]):
         kvec=kmesh[l,0:dim]
         i = np.argwhere( np.all((kkmat - kvec)==0, axis=1))[0][0]
-        # print  i
 
         E[i, nnE[i], 0] = bands[l]
         for n in range(nother):
@@ -683,6 +706,28 @@ def slice_on_line(E, kmesh, dim, nk, p1, p2, len0, spacing = None, kkin = None, 
     return (Eout, u, len1)      
         
 
+def import_file(file, abs_coords, use_mesh_grid = False):
+    
+    if "bands-gp.dat" in file.lower():
+        imported = import_bands_file(file, abs_coords=abs_coords, use_mesh_grid=use_mesh_grid)
+        
+    elif "eigenvalues" in file.lower() :     
+        imported = import_eigenvalues_file(file, abs_coords=abs_coords, use_mesh_grid=use_mesh_grid)            
+    elif "info" in file.lower():     
+        imported = import_eigenvalues_file(file, abs_coords=abs_coords, use_mesh_grid=use_mesh_grid)            
+    else:
+        try: 
+            imported = import_bands_file(file,not args.absolute)
+        except:
+            print("""
+Error: Unrecognized input file %s. The supported files 
+are \'bands-gp.dat\', \'info\' and \'eigenvalues\'."""%(file))
+            sys.exit(1)
+    
+    return imported
+    
+
+
 ######################## MAIN ################################
 
 def main(args):
@@ -827,28 +872,33 @@ Note: positional argument 'file' is ignored with this option."""
  be garbage.
 """
             )
+        if args.absolute:
+            imported = import_file(file, abs_coords = args.absolute)
+            kmesh_abs = imported[1]            
+            imported = import_file(file, abs_coords = False, use_mesh_grid = True)
+        else:        
+            imported = import_file(file, abs_coords=args.absolute)
         
-
-        if "bands-gp.dat" in file.lower():
-            if args.absolute:
-                imported = import_bands_file(file, abs_coords = args.absolute)
-                kmesh_abs = imported[1]            
-                imported = import_bands_file(file, abs_coords = False, use_mesh_grid = True)
-            else:
-                imported = import_bands_file(file, abs_coords = args.absolute)
-                
-        elif "eigenvalues" in file.lower() :     
-            imported = import_eigenvalues_file(file)            
-        elif "info" in file.lower():     
-            imported = import_eigenvalues_file(file)            
-        else:
-            try: 
-                imported = import_bands_file(file,not args.absolute)
-            except:
-                print("""
-Error: Unrecognized input file %s. The supported files 
-are \'bands-gp.dat\', \'info\' and \'eigenvalues\'."""%(file))
-                sys.exit(1)
+#         if "bands-gp.dat" in file.lower():
+#             if args.absolute:
+#                 imported = import_bands_file(file, abs_coords = args.absolute)
+#                 kmesh_abs = imported[1]
+#                 imported = import_bands_file(file, abs_coords = False, use_mesh_grid = True)
+#             else:
+#                 imported = import_bands_file(file, abs_coords = args.absolute)
+#
+#         elif "eigenvalues" in file.lower() :
+#             imported = import_eigenvalues_file(file)
+#         elif "info" in file.lower():
+#             imported = import_eigenvalues_file(file)
+#         else:
+#             try:
+#                 imported = import_bands_file(file,not args.absolute)
+#             except:
+#                 print("""
+# Error: Unrecognized input file %s. The supported files
+# are \'bands-gp.dat\', \'info\' and \'eigenvalues\'."""%(file))
+#                 sys.exit(1)
 
         E = imported[0]  
         kmesh = imported[1]            
@@ -861,16 +911,16 @@ are \'bands-gp.dat\', \'info\' and \'eigenvalues\'."""%(file))
             header = "# This file contains %s bands"%(E.shape[3])
 
             if E.shape[4]>1:
-                print "with %d spin compoments"%(E.shape[4]-1)
-                header = "%s with %d spin compoments.\n"%(header,E.shape[4]-1)
+                print "with %d spin components"%(E.shape[4]-1)
+                header = "%s with %d spin components (reduced coordinates).\n"%(header,E.shape[4]-1)
             else:
                 header = "%s.\n"%(header)
         else:
             print "Detected a %d-dimensional k-space with %d k-points and %d bands "%(dim,E.shape[0],E.shape[1])
             header = "# This file contains %s bands"%(E.shape[1])
             if E.shape[2]>1:
-                print "with %d spin compoments"%(E.shape[2]-1)
-                header = "%s with %d spin compoments.\n"%(header,E.shape[2]-1)
+                print "with %d spin components"%(E.shape[2]-1)
+                header = "%s with %d spin components (absolute coordinates).\n"%(header,E.shape[2]-1)
             else:
                 header = "%s.\n"%(header)
             
