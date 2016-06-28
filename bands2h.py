@@ -438,11 +438,11 @@ def get_Ei_from_bands (kx,ky,kz,kmesh, nbands, bands, dim, other = None ):
 
 
     for i in range(kx.shape[0]):
-        for j in range(ky.shape[0]):
-            for m in range(kz.shape[0]):
+        # for j in range(ky.shape[0]):
+        #     for m in range(kz.shape[0]):
                 # we have to sort all the other columns contaitning the spin 
                 # according only to energy ordering
-                E[i,:,:] = E[i, np.argsort(E[i,:,0])]
+        E[i,:,:] = E[i, np.argsort(E[i,:,0])]
 
         update_progress(i/(kx.shape[0]-1))
     
