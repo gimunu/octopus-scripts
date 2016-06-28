@@ -202,7 +202,7 @@ def find_custom_kpoint_indices(fname, nk):
 
     return idx0.astype(np.int)+1
     
-def import_eigenvalues_file(fname, abs_coords, use_mesh_grid = False):
+def import_eigenvalues_file(fname, abs_coords, use_mesh_grid = False, skip_E = False):
     
     use_mesh_grid = use_mesh_grid or abs_coords
     
@@ -318,7 +318,10 @@ def import_eigenvalues_file(fname, abs_coords, use_mesh_grid = False):
     if use_mesh_grid:
         # select from kmesh with nbands stride
         kx, ky, kz = kmesh[1::nbands,0], kmesh[1::nbands,1], kmesh[1::nbands,2]
-        E = get_Ei_from_bands (kx,ky,kz, kmesh, nbands, E, dim, spin)
+        if not skip_E:
+            E = get_Ei_from_bands (kx,ky,kz, kmesh, nbands, E, dim, spin)  
+        else:
+            E = np.zeros(1)
     else:
         E = get_Eijm_from_bands (kx,ky,kz, kmesh, nbands, E, dim, spin)
     
@@ -734,7 +737,7 @@ def slice_on_line(E, kmesh, dim, nk, p1, p2, len0, spacing = None, kkin = None, 
     return (Eout, u, len1)      
         
 
-def import_file(file, abs_coords, use_mesh_grid = False):
+def import_file(file, abs_coords, use_mesh_grid = False, skip_E = False):
     
     if "bands-gp.dat" in file.lower():
         imported = import_bands_file(file, abs_coords=abs_coords, use_mesh_grid=use_mesh_grid)
@@ -742,7 +745,7 @@ def import_file(file, abs_coords, use_mesh_grid = False):
     elif "eigenvalues" in file.lower() :     
         imported = import_eigenvalues_file(file, abs_coords=abs_coords, use_mesh_grid=use_mesh_grid)            
     elif "info" in file.lower():     
-        imported = import_eigenvalues_file(file, abs_coords=abs_coords, use_mesh_grid=use_mesh_grid)            
+        imported = import_eigenvalues_file(file, abs_coords=abs_coords, use_mesh_grid=use_mesh_grid, skip_E = skip_E)            
     else:
         try: 
             imported = import_bands_file(file,not args.absolute)
@@ -901,7 +904,7 @@ Note: positional argument 'file' is ignored with this option."""
 """
             )
         if args.absolute:
-            imported = import_file(file, abs_coords = args.absolute)
+            imported = import_file(file, abs_coords = args.absolute, skip_E = True)
             kmesh_abs = imported[1]            
             imported = import_file(file, abs_coords = False, use_mesh_grid = True)
         else:        
