@@ -253,7 +253,6 @@ def import_eigenvalues_file(fname, abs_coords, use_mesh_grid = False):
             if il > 2:
                 break
             rvec = line.strip('\n').split()
-            print rvec
             for j,val in enumerate(rvec):
                 rlattice[il,j]=np.float(val)
         # multiply each kpoint for the reciprocal lattice vectors
