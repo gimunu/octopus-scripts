@@ -3,26 +3,83 @@ import numpy as np
 import pandas as pd
 import traj_weigth as weight
 
+import sys
+import yaml
 
-############
-Radius = 50
-
-ne = 200
-kmax = 2
-Emax = kmax**2/2.
-
-selectV = [-0.12, -0.05]#[0.05, 0.12]
-
-have_vel = False
-#############
+import time
+import pprint
 
 
-def get_pes(traj, weights, laser, dt, v_traj=None, vtarget = None):
+#---------------------------------------
+def init_params(parameters_in = None, append_to_default = None):
+    """docstring for init_params"""
+
+    ########## DEFAULT PARAMETERS #########
+
+    parameters  = {}
+    parameters['radius']   = 50
+    parameters['have_vel'] = False
+    parameters['strategy'] = 'full'
+    
+    parameters['density_file']    = 'static/density.y=0,z=0'
+    parameters['trajectory_file'] = 'td.general/trajectories'
+    parameters['laser_file']      = 'td.general/laser'
+
+
+    # output
+    parameters['pmax']   = 2
+    parameters['emax']   = parameters['pmax']**2/2.
+    parameters['nume']   = 200
+
+    parameters['selectV'] = None #[-0.12, -0.05]
+    
+
+    if append_to_default is not None:
+        parameters.update(append_to_default)
+    
+    ##### input parameters ######
+    if parameters_in is not None:
+        for key in parameters_in:
+            if key.lower() in parameters:
+                parameters[key.lower()] = parameters_in[key]
+
+    pprint.pprint('#####################################################')
+    pprint.pprint(parameters)
+    pprint.pprint('#####################################################')
+
+
+    return parameters
+
+#---------------------------------------
+def parse_inp(inp_file):
+    
+    with open(inp_file, 'r') as stream:
+        try:
+            params= yaml.load(stream)
+            for key in params:
+                try:
+                    params[key] = eval(params[key])
+
+                except:
+                    pass
+                
+            # if (rank == 0): pprint.pprint(params)
+            
+        except yaml.YAMLError as exc:
+            print(exc)
+            params = {}
+
+    return params        
+
+
+#---------------------------------------
+def get_pes(parameters, traj, weights, laser, dt, v_traj=None, vtarget = None):
     """Photoelectron velocity distribution"""
     use_vel = False
     if v_traj is not None:
         use_vel = True
-    print use_vel
+    
+    Radius = parameters['radius']
     
     ntr = traj.shape[1]
 
@@ -33,7 +90,7 @@ def get_pes(traj, weights, laser, dt, v_traj=None, vtarget = None):
     
     nocross = 0
 
-    if False:
+    if parameters['strategy'] == 'flux':
         Rthr= abs(rho[1,0]-rho[0,0])*3 #grid spacing 
         for itr in range(ntr):
             trj  = traj[:,itr]
@@ -90,7 +147,7 @@ def get_pes(traj, weights, laser, dt, v_traj=None, vtarget = None):
             ww.append(weights[itr])
         
 
-    else:
+    elif parameters['strategy'] == 'full':
     #analyze the current outside the region r>R at max time
         nabegde=0 
         maxtrj = 0 
@@ -117,11 +174,10 @@ def get_pes(traj, weights, laser, dt, v_traj=None, vtarget = None):
                 nocross += 1
     
 
-            if trjR[it-1]>=170**2:
-                nabegde+=1
-        print "maxtrj =", maxtrj        
-        print "number of trajectories in the boundary region =",nabegde,"(%2.2f)"%(nabegde*100.0/ntr)
+        print "trajectories maximum value =", maxtrj        
 
+    else:
+        raise NameError('Undefined strategy \''+ parameters['strategy']+'\'')
 
     print "number of trajectories not crossing the border =",nocross,"(%2.2f)"%(nocross*100.0/ntr)
 
@@ -137,10 +193,28 @@ def get_pes(traj, weights, laser, dt, v_traj=None, vtarget = None):
 ###################################
 if __name__ == "__main__":
 
-    rho=np.loadtxt('static/density.y=0,z=0')
+
+    if len(sys.argv) > 1:
+        inp_file = sys.argv[1]
+
+        params_in = parse_inp(inp_file)
+    
+    else:
+        params_in={}
+    
+    parameters = init_params(params_in)
+
+
+    ne   = parameters['nume']
+    kmax = parameters['pmax']
+    Emax = parameters['emax']
+    selectV = parameters['selectV']
+    have_vel = parameters['have_vel']
+
+    rho=np.loadtxt(parameters['density_file'])
     dim = rho.shape[1]-1
 
-    laserd=np.loadtxt('td.general/laser')
+    laserd=np.loadtxt(parameters['laser_file'])
     laser=np.zeros((laserd.shape[0],dim))
     # get the full field
     for idim in range(dim):
@@ -148,7 +222,7 @@ if __name__ == "__main__":
 
     # data = np.array(pd.read_csv('td.general/trajectories', comment="#",delim_whitespace=True))
  
-    data=np.loadtxt('td.general/trajectories')
+    data=np.loadtxt(parameters['trajectory_file'])
     ntr = int((data.shape[1]-2)/dim)
     if (have_vel):
         ntr = int(ntr/2) 
@@ -157,6 +231,8 @@ if __name__ == "__main__":
     else:
         traj = data[:, 2:]
         v_traj = None
+    
+    print "Number of trajectories = %d"%(ntr)
 
     points = data[0, 2:]
     weights = weight.get_weight(points,rho)
@@ -164,13 +240,15 @@ if __name__ == "__main__":
     dt = abs(data[1,1]- data[0,1])
 
 
-    velocities, ww, outtrj = get_pes(traj, weights, laser, dt, v_traj = v_traj, vtarget = selectV)
+    velocities, ww, outtrj = get_pes(parameters, traj, weights, laser, dt, v_traj = v_traj, vtarget = selectV)
 
+
+    #OutPut 
 
     # Energy distribution
     
     kinen = velocities**2/2.0 #electron mass is 1 in atomic units
-    Egrid=np.linspace(0., Emax,ne)
+    Egrid=np.linspace(0., Emax, ne)
     De = Egrid[1]-Egrid[0]
 
     hist = np.zeros(Egrid.shape[0])
@@ -185,7 +263,7 @@ if __name__ == "__main__":
 
     print "sum =", pes.sum()
 
-    f = open('espect','w')
+    f = open('espect.'+parameters['strategy'],'w')
     for ii in range(hist.shape[0]):
        f.write("%1.3e\t %1.3e\t %1.3e\n"%(Egrid[ii],pes[ii],hist[ii]))       
    
@@ -208,26 +286,27 @@ if __name__ == "__main__":
 
     print "sum =", pes.sum()
 
-    f = open('vspect','w')
+    f = open('vspect.'+parameters['strategy'],'w')
     for ii in range(hist.shape[0]):
        f.write("%1.3e\t %1.3e\t %1.3e\n"%(Vgrid[ii],pes[ii],hist[ii]))       
    
     f.close()   
     
     # Selected trajectories
-    f = open('trj.sel','w')
-    f.write("##############\n#\n")
-    f.write("# Trajectories number = %d\n"%(outtrj.shape[0]))
-    f.write("# Vrange = %s\n"%(selectV))
-    f.write("#\n##############\n")
+    if selectV is not None:
+        f = open('trj.sel','w')
+        f.write("##############\n#\n")
+        f.write("# Trajectories number = %d\n"%(outtrj.shape[0]))
+        f.write("# Vrange = %s\n"%(selectV))
+        f.write("#\n##############\n")
     
-    for ii in range(data.shape[0]):
-       f.write("%d\t %1.3e"%(data[ii, 0],data[ii, 1]))
-       for itr in range(outtrj.shape[0]):
-           f.write("\t %1.3e"%(outtrj[itr,ii]))      
-       f.write("\n")
+        for ii in range(data.shape[0]):
+           f.write("%d\t %1.3e"%(data[ii, 0],data[ii, 1]))
+           for itr in range(outtrj.shape[0]):
+               f.write("\t %1.3e"%(outtrj[itr,ii]))      
+           f.write("\n")
    
-    f.close()   
+        f.close()   
 
     
     
