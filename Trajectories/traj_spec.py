@@ -62,9 +62,7 @@ def parse_inp(inp_file):
 
                 except:
                     pass
-                
-            # if (rank == 0): pprint.pprint(params)
-            
+                            
         except yaml.YAMLError as exc:
             print(exc)
             params = {}
@@ -95,9 +93,8 @@ def get_pes(parameters, traj, weights, laser, dt, v_traj=None, vtarget = None):
         for itr in range(ntr):
             trj  = traj[:,itr]
             trjR = trj[:]**2
-            # print trjR
-            # idx  = np.where( abs(trjR - Radius**2)<=Rthr**2 )
-            idx  = np.where( trjR > Radius**2)
+        
+            idx  = np.where( trjR > Radius**2)    
             # Skip the trajectories that don't cross the border
             if not len(idx[0]):
                 nocross += 1
@@ -128,11 +125,10 @@ def get_pes(parameters, traj, weights, laser, dt, v_traj=None, vtarget = None):
             for it in range(len(idx)):
                 it = idx[it]
 
-                # vv +=  (trj[it]- trj[it-1])/dt   + laser[it]/137
                 if (use_vel):
                     vv = v_traj[it,itr] + laser[it]/137
                 else:
-                    vv =  (3/2*trj[it] -2*trj[it-1] +1/2*trj[it-2])/dt + laser[it]/137#/weights[itr]
+                    vv =  (3/2*trj[it] -2*trj[it-1] +1/2*trj[it-2])/dt + laser[it]/137
                 
                 if (laser[it]/137 > 0):
                     print itr, it, trj[it]
@@ -202,6 +198,10 @@ if __name__ == "__main__":
     else:
         params_in={}
     
+    # oct_parameters = parse_inp('exec/parser.log')
+    # pprint.pprint(oct_parameters)
+    # exit()
+    
     parameters = init_params(params_in)
 
 
@@ -265,7 +265,7 @@ if __name__ == "__main__":
 
     f = open('espect.'+parameters['strategy'],'w')
     for ii in range(hist.shape[0]):
-       f.write("%1.3e\t %1.3e\t %1.3e\n"%(Egrid[ii],pes[ii],hist[ii]))       
+       f.write("%1.3e\t %1.3e\t %1.3e\n"%(Egrid[ii],pes[ii]*np.sqrt(2*Egrid[ii]),hist[ii]))       
    
     f.close()   
 
