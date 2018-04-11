@@ -78,6 +78,7 @@ def get_pes(parameters, traj, weights, laser, dt, v_traj=None, vtarget = None):
         use_vel = True
     
     Radius = parameters['radius']
+    dim = parameters['dim']
     
     ntr = traj.shape[1]
 
@@ -91,8 +92,8 @@ def get_pes(parameters, traj, weights, laser, dt, v_traj=None, vtarget = None):
     if parameters['strategy'] == 'flux':
         Rthr= abs(rho[1,0]-rho[0,0])*3 #grid spacing 
         for itr in range(ntr):
-            trj  = traj[:,itr]
-            trjR = trj[:]**2
+            trj  = traj[:,itr,:]
+            trjR = np.sum(trj[:,:]**2, axis=1)
         
             idx  = np.where( trjR > Radius**2)    
             # Skip the trajectories that don't cross the border
@@ -150,8 +151,8 @@ def get_pes(parameters, traj, weights, laser, dt, v_traj=None, vtarget = None):
         it = traj.shape[0]-1
         # it = 7000
         for itr in range(ntr):
-            trj  = traj[:,itr]
-            trjR = trj[:]**2
+            trj  = traj[:,itr,:]
+            trjR = np.sum(trj[:,:]**2, axis=1)
             maxtrj = np.sqrt(trjR[it]) if (np.sqrt(trjR[it])>maxtrj) else maxtrj 
             if trjR[it-1]>=Radius**2:
                 if (use_vel):
@@ -163,7 +164,6 @@ def get_pes(parameters, traj, weights, laser, dt, v_traj=None, vtarget = None):
                 if vtarget is not None:
                     if (vv <= vtarget[1] and vv >= vtarget[0]):
                         targ_trj.append(trj)                
-   
                 velocities.append(vv)
                 ww.append(weights[itr])
             else:
@@ -175,7 +175,7 @@ def get_pes(parameters, traj, weights, laser, dt, v_traj=None, vtarget = None):
     else:
         raise NameError('Undefined strategy \''+ parameters['strategy']+'\'')
 
-    print "number of trajectories not crossing the border =",nocross,"(%2.2f)"%(nocross*100.0/ntr)
+    print "number of trajectories not crossing the border =",nocross,"(%2.1f%%)"%(nocross*100.0/ntr)
 
 
     velocities = np.array(velocities)
@@ -205,14 +205,13 @@ if __name__ == "__main__":
     parameters = init_params(params_in)
 
 
-    ne   = parameters['nume']
-    kmax = parameters['pmax']
-    Emax = parameters['emax']
     selectV = parameters['selectV']
     have_vel = parameters['have_vel']
 
     rho=np.loadtxt(parameters['density_file'])
     dim = rho.shape[1]-1
+    parameters['dim'] = dim
+    print "Dimensions: %d"%(dim)
 
     laserd=np.loadtxt(parameters['laser_file'])
     laser=np.zeros((laserd.shape[0],dim))
@@ -228,9 +227,12 @@ if __name__ == "__main__":
         ntr = int(ntr/2) 
         traj = data[:, 2:ntr+2]
         v_traj = data[:, ntr+2:]
+        v_traj = v_traj.reshape((-1,ntr,dim))
     else:
         traj = data[:, 2:]
         v_traj = None
+        
+    traj = traj.reshape((-1,ntr,dim))
     
     print "Number of trajectories = %d"%(ntr)
 
@@ -246,8 +248,11 @@ if __name__ == "__main__":
     #OutPut 
 
     # Energy distribution
+    ne   = parameters['nume']
+    Emax = parameters['emax']
     
-    kinen = velocities**2/2.0 #electron mass is 1 in atomic units
+    
+    kinen = np.sum(velocities[:,:]**2,axis=1)/2.0 #electron mass is 1 in atomic units
     Egrid=np.linspace(0., Emax, ne)
     De = Egrid[1]-Egrid[0]
 
@@ -261,34 +266,78 @@ if __name__ == "__main__":
             hist[idx] += 1 
             pes[idx] += ww[ii]
 
-    print "sum =", pes.sum()
+    print "Pes spectrum integral =", pes.sum()*De
 
     f = open('espect.'+parameters['strategy'],'w')
     for ii in range(hist.shape[0]):
-       f.write("%1.3e\t %1.3e\t %1.3e\n"%(Egrid[ii],pes[ii]*np.sqrt(2*Egrid[ii]),hist[ii]))       
+       f.write("%1.6e\t %1.6e\t %1.6e\n"%(Egrid[ii],pes[ii]*np.sqrt(2*Egrid[ii]),hist[ii]))       
    
     f.close()   
 
     # Velocity distribution
+    kmax = parameters['pmax']
+    Lgrid=np.linspace(-kmax, kmax,ne)
+    if dim ==1:
+        Vgrid = np.meshgrid(Lgrid)    
+    elif dim ==2:
+        Vgrid = np.meshgrid(Lgrid,Lgrid, indexing='ij')
+    elif dim ==3:
+        Vgrid = np.meshgrid(Lgrid,Lgrid,Lgrid,  indexing='ij')
 
-    Vgrid=np.linspace(-kmax, kmax,ne)
-    Dv = Vgrid[1]-Vgrid[0]
+    
+    # print np.meshgrid(Lgrid)[0]
+    # print Vgrid[0]
+    # print Vgrid[1]
+    # exit()
 
-    hist = np.zeros(Egrid.shape[0])
-    pes = np.zeros(Egrid.shape[0])
+    DL = Lgrid[1]-Lgrid[0]
+
+
+    hist = np.zeros(Vgrid[0].shape[:])
+    pes = np.zeros(Vgrid[0].shape[:])
+
+    print pes.shape[:]
+    for iv in range(velocities.shape[0]):
+        print "%1.6e\t %1.6e"%(velocities[iv, 0],velocities[iv, 1])
 
     #binning 
+    idxa=np.zeros(dim,dtype=int)
     for ii in range(velocities.shape[0]):
-        idx = int((velocities[ii] -Vgrid.min())/Dv)
-        if (idx <= ne):    
+        for idim in range(dim):
+            idxa[idim] = int((velocities[ii, idim] -Lgrid.min())/DL)    
+        if (all(idxa[:] <= ne)):  
+            idx = tuple(idxa)  
+            # dist = np.sqrt(np.sum(velocities[ii,:] -[Vgrid[0][idx], Vgrid[1][idx]])**2)
+            # if (dist > DL*np.sqrt(2)):
+            diff = velocities[ii,:] -[Vgrid[0][idx], Vgrid[1][idx]]
+            if (any(diff > DL)):
+                print idx
+                print dist, DL*np.sqrt(2),DL
+                print diff
+                print velocities[ii,:], Vgrid[0][idx], Vgrid[1][idx]
+            # print Vgrid[0][idx],Vgrid[1][idx]
             hist[idx] += 1 
             pes[idx] += ww[ii]
+
+    # print Vgrid[0][0,0],Vgrid[1][0,0]
+    # print Vgrid[0][0,-1],Vgrid[1][0,-1]
 
     print "sum =", pes.sum()
 
     f = open('vspect.'+parameters['strategy'],'w')
-    for ii in range(hist.shape[0]):
-       f.write("%1.3e\t %1.3e\t %1.3e\n"%(Vgrid[ii],pes[ii],hist[ii]))       
+    if   (dim==1):
+        for ii in range(Lgrid.shape[0]):
+                f.write("%1.6e\t"%(Vgrid[0][ii]))
+                f.write("%1.6e\t %1.6e\n"%(pes[ii],hist[ii]))
+            
+    elif (dim==2):        
+        for jj in range(Lgrid.shape[0]):
+            for ii in range(Lgrid.shape[0]):
+                for jdim in range(dim):
+                    f.write("%1.6e\t"%(Vgrid[jdim][ii,jj]))
+                    # f.write("%1.3e\t %1.3e\t %1.3e\n"%(Vgrid[ii],pes[ii],hist[ii]))
+                f.write("%1.6e\t %1.6e\n"%(pes[ii,jj],hist[ii,jj]))
+            f.write("\n")
    
     f.close()   
     
@@ -301,9 +350,9 @@ if __name__ == "__main__":
         f.write("#\n##############\n")
     
         for ii in range(data.shape[0]):
-           f.write("%d\t %1.3e"%(data[ii, 0],data[ii, 1]))
+           f.write("%d\t %1.6e"%(data[ii, 0],data[ii, 1]))
            for itr in range(outtrj.shape[0]):
-               f.write("\t %1.3e"%(outtrj[itr,ii]))      
+               f.write("\t %1.6e"%(outtrj[itr,ii]))      
            f.write("\n")
    
         f.close()   

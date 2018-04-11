@@ -12,10 +12,23 @@ def get_weight(points, rho):
     dim = rho.shape[1]-1
     if dim == 1:
         ww = get_weight_1D(points, rho)
+    else: 
+        # need to implement properly
+        ww = np.zeros(points.shape[0])
+        ww = ww + rho[:,dim].sum()*(rho[1,dim-1]-rho[0,dim-1])**dim/points.shape[0]
     #
     # if dim==2:
     #     vor = Voronoi(points)
     #     print vor
+
+
+    sumW = ww.sum()
+    sumN = rho[:,dim].sum()*(rho[1,dim-1]-rho[0,dim-1])**dim
+    # Checksum 
+    if abs(sumW-sumN)> 1E-4:
+        print "Weights density checksum failed: %e instead of %e"%(sumW, sumN)
+
+    
     
     return ww
     
@@ -52,12 +65,6 @@ def get_weight_1D(points, rho):
         dx = xx[1]-xx[0]
         weight[ip] = np.sum(np.interp(xx, rho[:,0], rho[:,1]))*dx
     
-    sumW = weight.sum()
-    sumN = rho[:,1].sum()*(rho[1,0]-rho[0,0])
-    # Checksum 
-    if abs(sumW-sumN)> 1E-4:
-        print "Weights density checksum failed: %e instead of %e"%(sumW, sumN)
-
     #come back to the original point ordering 
     return weight[idx_inv]
 
