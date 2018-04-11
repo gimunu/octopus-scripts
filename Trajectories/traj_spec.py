@@ -284,11 +284,6 @@ if __name__ == "__main__":
     elif dim ==3:
         Vgrid = np.meshgrid(Lgrid,Lgrid,Lgrid,  indexing='ij')
 
-    
-    # print np.meshgrid(Lgrid)[0]
-    # print Vgrid[0]
-    # print Vgrid[1]
-    # exit()
 
     DL = Lgrid[1]-Lgrid[0]
 
@@ -296,9 +291,6 @@ if __name__ == "__main__":
     hist = np.zeros(Vgrid[0].shape[:])
     pes = np.zeros(Vgrid[0].shape[:])
 
-    print pes.shape[:]
-    for iv in range(velocities.shape[0]):
-        print "%1.6e\t %1.6e"%(velocities[iv, 0],velocities[iv, 1])
 
     #binning 
     idxa=np.zeros(dim,dtype=int)
@@ -307,20 +299,15 @@ if __name__ == "__main__":
             idxa[idim] = int((velocities[ii, idim] -Lgrid.min())/DL)    
         if (all(idxa[:] <= ne)):  
             idx = tuple(idxa)  
-            # dist = np.sqrt(np.sum(velocities[ii,:] -[Vgrid[0][idx], Vgrid[1][idx]])**2)
-            # if (dist > DL*np.sqrt(2)):
-            diff = velocities[ii,:] -[Vgrid[0][idx], Vgrid[1][idx]]
-            if (any(diff > DL)):
-                print idx
-                print dist, DL*np.sqrt(2),DL
-                print diff
-                print velocities[ii,:], Vgrid[0][idx], Vgrid[1][idx]
-            # print Vgrid[0][idx],Vgrid[1][idx]
+            # diff = velocities[ii,:] -[Vgrid[0][idx], Vgrid[1][idx]]
+            # if (any(diff > DL)):
+            #     print idx
+            #     print dist, DL*np.sqrt(2),DL
+            #     print diff
+            #     print velocities[ii,:], Vgrid[0][idx], Vgrid[1][idx]
             hist[idx] += 1 
             pes[idx] += ww[ii]
 
-    # print Vgrid[0][0,0],Vgrid[1][0,0]
-    # print Vgrid[0][0,-1],Vgrid[1][0,-1]
 
     print "sum =", pes.sum()
 
@@ -340,6 +327,14 @@ if __name__ == "__main__":
             f.write("\n")
    
     f.close()   
+
+    # debug the velocity distribution
+    f = open('vspect.raw','w')
+    for ii in range(velocities.shape[0]):
+        for idim in range(dim):
+            f.write("%1.6e\t"%(velocities[ii, idim]))
+        f.write("\n")    
+    f.close() 
     
     # Selected trajectories
     if selectV is not None:
