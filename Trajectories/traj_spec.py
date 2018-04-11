@@ -297,7 +297,7 @@ if __name__ == "__main__":
     for ii in range(velocities.shape[0]):
         for idim in range(dim):
             idxa[idim] = int((velocities[ii, idim] -Lgrid.min())/DL)    
-        if (all(idxa[:] <= ne)):  
+        if (all(idxa[:] < ne)):  
             idx = tuple(idxa)  
             # diff = velocities[ii,:] -[Vgrid[0][idx], Vgrid[1][idx]]
             # if (any(diff > DL)):
