@@ -30,6 +30,7 @@ def init_params(parameters_in = None, append_to_default = None):
     parameters['pmax']   = 2
     parameters['emax']   = parameters['pmax']**2/2.
     parameters['nume']   = 200
+    parameters['eta']    = 0.01
 
     parameters['selectV'] = None #[-0.12, -0.05]
     
@@ -250,7 +251,7 @@ if __name__ == "__main__":
     # Energy distribution
     ne   = parameters['nume']
     Emax = parameters['emax']
-    
+    eta  = parameters['eta'] 
     
     kinen = np.sum(velocities[:,:]**2,axis=1)/2.0 #electron mass is 1 in atomic units
     Egrid=np.linspace(0., Emax, ne)
@@ -258,21 +259,27 @@ if __name__ == "__main__":
 
     hist = np.zeros(Egrid.shape[0])
     pes = np.zeros(Egrid.shape[0])
+    pes_sm = np.zeros(Egrid.shape[0])
 
     #binning 
     for ii in range(kinen.shape[0]):
+        pes_sm[:] += ww[ii] * np.imag(1.0 /(Egrid[:] - kinen[ii]  - 1j*eta))
+
         idx = int((kinen[ii]-Egrid.min())/De)
-        if (idx <= ne):
+        if (idx < ne):
             hist[idx] += 1 
-            pes[idx] += ww[ii]
+            pes[idx]  += ww[ii]
 
     print "Pes spectrum integral =", pes.sum()*De
 
     f = open('espect.'+parameters['strategy'],'w')
     for ii in range(hist.shape[0]):
-       f.write("%1.6e\t %1.6e\t %1.6e\n"%(Egrid[ii],pes[ii]*np.sqrt(2*Egrid[ii]),hist[ii]))       
+       f.write("%1.6e\t %1.6e\t %1.6e\t %1.6e\n"%(Egrid[ii],pes_sm[ii]*np.sqrt(2*Egrid[ii]), pes[ii]*np.sqrt(2*Egrid[ii]), hist[ii]))       
    
     f.close()   
+
+
+
 
     # Velocity distribution
     kmax = parameters['pmax']
@@ -299,12 +306,6 @@ if __name__ == "__main__":
             idxa[idim] = int((velocities[ii, idim] -Lgrid.min())/DL)    
         if (all(idxa[:] < ne)):  
             idx = tuple(idxa)  
-            # diff = velocities[ii,:] -[Vgrid[0][idx], Vgrid[1][idx]]
-            # if (any(diff > DL)):
-            #     print idx
-            #     print dist, DL*np.sqrt(2),DL
-            #     print diff
-            #     print velocities[ii,:], Vgrid[0][idx], Vgrid[1][idx]
             hist[idx] += 1 
             pes[idx] += ww[ii]
 
