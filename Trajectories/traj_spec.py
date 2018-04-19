@@ -238,7 +238,7 @@ if __name__ == "__main__":
     print "Number of trajectories = %d"%(ntr)
 
     points = data[0, 2:]
-    weights = weight.get_weight(points,rho)
+    (weights, vol) = weight.get_weight(points,rho)
 
     dt = abs(data[1,1]- data[0,1])
 
