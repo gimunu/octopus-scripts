@@ -1,7 +1,7 @@
 from __future__ import division
 import numpy as np
 import pandas as pd
-import traj_weigth as weight
+import traj_lib as tlib
 
 import sys
 import yaml
@@ -238,7 +238,7 @@ if __name__ == "__main__":
     print "Number of trajectories = %d"%(ntr)
 
     points = data[0, 2:]
-    (weights, vol) = weight.get_weight(points,rho)
+    (weights, vol) = tlib.get_weight(points,rho)
 
     dt = abs(data[1,1]- data[0,1])
 
