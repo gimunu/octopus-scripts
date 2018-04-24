@@ -33,6 +33,8 @@ def init_params(parameters_in = None, append_to_default = None):
     parameters['emax']   = parameters['pmax']**2/2.
     parameters['nume']   = 200
     parameters['eta']    = 0.01
+    
+    parameters['plot_vrange'] = None
 
     parameters['selectV'] = None #[-0.12, -0.05]
     
@@ -355,8 +357,10 @@ if __name__ == "__main__":
         x, y, z = velocities[idx,0], velocities[idx,1], ww[idx]
         cax=ax.scatter(x, y, c=z, s=20, edgecolor='', cmap=plt.get_cmap('gnuplot'))
         fig.colorbar(cax)
-        plt.ylim(-8,8)
-        plt.xlim(-8,8)
+        if parameters['plot_vrange'] is not None:
+            prange = parameters['plot_vrange']
+            plt.xlim(prange[0][0],prange[0][1])
+            plt.ylim(prange[1][0],prange[1][1])
         plt.show()
     
     
