@@ -152,12 +152,11 @@ def get_pes(parameters, traj, jac, rhok, laser, dt, v_traj=None, vtarget = None)
         nabegde=0 
         maxtrj = 0 
         it = traj.shape[0]-1
-        # it = 7000
         for itr in range(ntr):
             trj  = traj[:,itr,:]
             trjR = np.sum(trj[:,:]**2, axis=1)
             maxtrj = np.sqrt(trjR[it]) if (np.sqrt(trjR[it])>maxtrj) else maxtrj 
-            if trjR[it-1]>=Radius**2:
+            if trjR[it]>=Radius**2:
                 if (use_vel):
                     vv = v_traj[it,itr]
                 else:
@@ -209,7 +208,6 @@ if __name__ == "__main__":
 
 
     selectV = parameters['selectV']
-    have_vel = parameters['have_vel']
 
     rho=np.loadtxt(parameters['density_file'])
     dim = rho.shape[1]-1
@@ -223,11 +221,21 @@ if __name__ == "__main__":
         laser[:,idim] =laserd[:,idim+2::dim].sum(axis=1)
 
     # data = np.array(pd.read_csv('td.general/trajectories', comment="#",delim_whitespace=True))
+
+    # Red info from the trajectory file header 
+    with open(parameters['trajectory_file']) as myfile:
+        head = [next(myfile) for x in xrange(6)]
+    myfile.close()    
+    ntr = int(head[2].split()[-1:][0])
+    parameters['have_vel'] = False
+    if "velocities" in head[3].lower():
+        parameters['have_vel'] = True
+        print "Trajectory file contains velocities"
+        
+    have_vel = parameters['have_vel']
  
     data=np.loadtxt(parameters['trajectory_file'])
-    ntr = int((data.shape[1]-2)/(dim+1))
     if (have_vel):
-        ntr = int(ntr/2) 
         traj   = data[:, 2:ntr*dim+2]
         jac    = data[:, ntr*dim+2:ntr+ntr*dim+2]
         v_traj = data[:, ntr+ntr*dim+2:]
