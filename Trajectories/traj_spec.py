@@ -1,6 +1,8 @@
 from __future__ import division
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+
 import traj_lib as tlib
 
 import sys
@@ -72,7 +74,7 @@ def parse_inp(inp_file):
 
 
 #---------------------------------------
-def get_pes(parameters, traj, weights, laser, dt, v_traj=None, vtarget = None):
+def get_pes(parameters, traj, jac, rhok, laser, dt, v_traj=None, vtarget = None):
     """Photoelectron velocity distribution"""
     use_vel = False
     if v_traj is not None:
@@ -142,7 +144,7 @@ def get_pes(parameters, traj, weights, laser, dt, v_traj=None, vtarget = None):
                     
                 
             velocities.append(vv)
-            ww.append(weights[itr])
+            ww.append(rhok[itr])
         
 
     elif parameters['strategy'] == 'full':
@@ -166,7 +168,7 @@ def get_pes(parameters, traj, weights, laser, dt, v_traj=None, vtarget = None):
                     if (vv <= vtarget[1] and vv >= vtarget[0]):
                         targ_trj.append(trj)                
                 velocities.append(vv)
-                ww.append(weights[itr])
+                ww.append(rhok[itr]/jac[it,itr])
             else:
                 nocross += 1
     
@@ -223,14 +225,16 @@ if __name__ == "__main__":
     # data = np.array(pd.read_csv('td.general/trajectories', comment="#",delim_whitespace=True))
  
     data=np.loadtxt(parameters['trajectory_file'])
-    ntr = int((data.shape[1]-2)/dim)
+    ntr = int((data.shape[1]-2)/(dim+1))
     if (have_vel):
         ntr = int(ntr/2) 
-        traj = data[:, 2:ntr+2]
-        v_traj = data[:, ntr+2:]
+        traj   = data[:, 2:ntr*dim+2]
+        jac    = data[:, ntr*dim+2:ntr+ntr*dim+2]
+        v_traj = data[:, ntr+ntr*dim+2:]
         v_traj = v_traj.reshape((-1,ntr,dim))
     else:
-        traj = data[:, 2:]
+        traj = data[:, 2:ntr*dim+2]
+        jac  = data[:, ntr*dim+2:]
         v_traj = None
         
     traj = traj.reshape((-1,ntr,dim))
@@ -238,12 +242,12 @@ if __name__ == "__main__":
     print "Number of trajectories = %d"%(ntr)
 
     points = data[0, 2:]
-    (weights, vol) = tlib.get_weight(points,rho)
+    rhok = tlib.get_weight(points,rho) # the density sampled on the trajectories 
 
     dt = abs(data[1,1]- data[0,1])
 
 
-    velocities, ww, outtrj = get_pes(parameters, traj, weights, laser, dt, v_traj = v_traj, vtarget = selectV)
+    velocities, ww, outtrj = get_pes(parameters, traj, jac, rhok, laser, dt, v_traj = v_traj, vtarget = selectV)
 
 
     #OutPut 
@@ -329,13 +333,24 @@ if __name__ == "__main__":
    
     f.close()   
 
-    # debug the velocity distribution
+    # the velocity distribution
     f = open('vspect.raw','w')
     for ii in range(velocities.shape[0]):
         for idim in range(dim):
             f.write("%1.6e\t"%(velocities[ii, idim]))
-        f.write("\n")    
+        f.write("%1.6e\n"%(ww[ii]))    
     f.close() 
+
+    if dim ==2:
+        fig, ax = plt.subplots()
+        idx = ww.argsort()
+        x, y, z = velocities[idx,0], velocities[idx,1], ww[idx]
+        cax=ax.scatter(x, y, c=z, s=20, edgecolor='', cmap=plt.get_cmap('gnuplot'))
+        fig.colorbar(cax)
+        plt.ylim(-8,8)
+        plt.xlim(-8,8)
+        plt.show()
+    
     
     # Selected trajectories
     if selectV is not None:

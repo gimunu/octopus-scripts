@@ -1,5 +1,7 @@
 import numpy as np
-from scipy.spatial import Voronoi
+# from scipy.spatial import Voronoi
+from scipy import interpolate
+# import matplotlib.pyplot as plt
 
 
 # dim = 1
@@ -11,16 +13,12 @@ def get_weight(points, rho):
 
     dim = rho.shape[1]-1
     if dim == 1:
-        (ww,vol) = get_weight_1D(points, rho)
-    else: 
-        # need to implement properly
-        ww = np.zeros(points.shape[0])
-        ww = ww + rho[:,dim].sum()*(rho[1,dim-1]-rho[0,dim-1])**dim/points.shape[0]
-    #
-    # if dim==2:
-    #     vor = Voronoi(points)
-    #     print vor
-
+        ww = np.interp(points[:], rho[:,0], rho[:,1])
+        
+        # (ww,vol) = get_weight_1D(points, rho)
+    elif dim>=2: 
+        
+        ww = interpolate.griddata(rho[:,0:dim], rho[:,dim], points, method='cubic')
 
     sumW = ww.sum()
     sumN = rho[:,dim].sum()*(rho[1,dim-1]-rho[0,dim-1])**dim
@@ -28,9 +26,9 @@ def get_weight(points, rho):
     if abs(sumW-sumN)> 1E-4:
         print "Weights density checksum failed: %e instead of %e"%(sumW, sumN)
 
+        
     
-    
-    return (ww,vol)
+    return ww
     
 
 

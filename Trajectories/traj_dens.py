@@ -12,15 +12,13 @@ itern = data[:,0]
 
 rho=np.loadtxt('static/density.y=0,z=0')
 points = traj[0, :]
-(weights,vol0) = tlib.get_weight(points,rho)
+weights = tlib.get_weight(points,rho)
 
 dt = abs(data[1,1]- data[0,1])
 
 itt = 15000
 it = np.where(itern == itt)[0][0]
 
-points = traj[it,:]
-(trash,volt) = tlib.get_weight(points,rho)
 
 dx = abs(rho[1,0]-rho[0,0])
 hist = np.zeros(rho.shape[0])
