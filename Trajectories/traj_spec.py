@@ -34,7 +34,10 @@ def init_params(parameters_in = None, append_to_default = None):
     parameters['nume']   = 200
     parameters['eta']    = 0.01
     
-    parameters['plot_vrange'] = None
+
+    # Plotting options
+    parameters['plot_vrange']   = None
+    parameters['plot_logscale'] = False
 
     parameters['selectV'] = None #[-0.12, -0.05]
     
@@ -185,7 +188,9 @@ def get_pes(parameters, traj, jac, rhok, laser, dt, v_traj=None, vtarget = None)
     velocities = np.array(velocities)
     ww = np.array(ww)
     targ_trj = np.array(targ_trj)
-    
+
+    if (nocross == ntr):
+        velocities = None
     return (velocities, ww, targ_trj)
 
 ###################################
@@ -259,6 +264,9 @@ if __name__ == "__main__":
 
     velocities, ww, outtrj = get_pes(parameters, traj, jac, rhok, laser, dt, v_traj = v_traj, vtarget = selectV)
 
+    if velocities is None:
+        raise RuntimeError("Could not find any ionization trajectory!")
+        exit()
 
     #OutPut 
 
@@ -355,6 +363,8 @@ if __name__ == "__main__":
         fig, ax = plt.subplots()
         idx = ww.argsort()
         x, y, z = velocities[idx,0], velocities[idx,1], ww[idx]
+        if parameters['plot_logscale']:
+            z = np.log(z)
         cax=ax.scatter(x, y, c=z, s=20, edgecolor='', cmap=plt.get_cmap('gnuplot'))
         fig.colorbar(cax)
         if parameters['plot_vrange'] is not None:
