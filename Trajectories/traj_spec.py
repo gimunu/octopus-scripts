@@ -36,7 +36,9 @@ def init_params(parameters_in = None, append_to_default = None):
     
 
     # Plotting options
-    parameters['plot_vrange']   = None
+    parameters['plot_xrange']   = None
+    parameters['plot_yrange']   = None
+    parameters['plot_zrange']   = None
     parameters['plot_logscale'] = False
 
     parameters['selectV'] = None #[-0.12, -0.05]
@@ -364,13 +366,19 @@ if __name__ == "__main__":
         idx = ww.argsort()
         x, y, z = velocities[idx,0], velocities[idx,1], ww[idx]
         if parameters['plot_logscale']:
-            z = np.log(z)
+            z = np.log10(z)
         cax=ax.scatter(x, y, c=z, s=20, edgecolor='', cmap=plt.get_cmap('gnuplot'))
         fig.colorbar(cax)
-        if parameters['plot_vrange'] is not None:
-            prange = parameters['plot_vrange']
-            plt.xlim(prange[0][0],prange[0][1])
-            plt.ylim(prange[1][0],prange[1][1])
+        if parameters['plot_xrange'] is not None:
+            prange = parameters['plot_xrange']
+            ax.set_xlim(prange)
+        if parameters['plot_yrange'] is not None:
+            prange = parameters['plot_yrange']
+            ax.set_ylim(prange)
+        if parameters['plot_zrange'] is not None:
+            prange = parameters['plot_zrange']
+            cax.set_clim(vmin=prange[0],vmax=prange[1])
+            
         plt.show()
     
     
