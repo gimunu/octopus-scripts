@@ -327,14 +327,16 @@ if __name__ == "__main__":
     idxa=np.zeros(dim,dtype=int)
     for ii in range(velocities.shape[0]):
         for idim in range(dim):
-            idxa[idim] = int((velocities[ii, idim] -Lgrid.min())/DL)    
-        if (all(idxa[:] < ne)):  
+            idxa[idim] = int((velocities[ii, idim] -Lgrid.min())/DL) 
+        if (all(idxa[:] < ne) and all(idxa[:] > 0)):  
             idx = tuple(idxa)  
             hist[idx] += 1 
-            pes[idx] += ww[ii]
+            pes[idx]  += ww[ii]
 
 
     print "sum =", pes.sum()
+    idx = np.where(hist>0)
+    pes[idx] = pes[idx]/hist[idx] # average the binned spectrum
 
     f = open('vspect.'+parameters['strategy'],'w')
     if   (dim==1):
