@@ -159,6 +159,7 @@ def get_pes(parameters, traj, jac, rhok, laser, dt, v_traj=None, vtarget = None)
         nabegde=0 
         maxtrj = 0 
         it = traj.shape[0]-1
+        jacInt = 0
         for itr in range(ntr):
             trj  = traj[:,itr,:]
             trjR = np.sum(trj[:,:]**2, axis=1)
@@ -175,6 +176,7 @@ def get_pes(parameters, traj, jac, rhok, laser, dt, v_traj=None, vtarget = None)
                         targ_trj.append(trj)                
                 velocities.append(vv)
                 ww.append(rhok[itr]/jac[it,itr])
+                jacInt += 1/jac[it,itr]
             else:
                 nocross += 1
     
@@ -186,6 +188,7 @@ def get_pes(parameters, traj, jac, rhok, laser, dt, v_traj=None, vtarget = None)
 
     print "number of trajectories not crossing the border =",nocross,"(%2.1f%%)"%(nocross*100.0/ntr)
 
+    print "Integral of the Jacobian over the trajectories",jacInt
 
     velocities = np.array(velocities)
     ww = np.array(ww)
